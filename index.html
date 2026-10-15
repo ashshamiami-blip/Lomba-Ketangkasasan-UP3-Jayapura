@@ -158,6 +158,8 @@ body.noanim .bar,body.noanim .crown,body.noanim .bar3 i{animation:none}
 body .prov .bar,body.noanim .prov .bar{animation:glow 1.5s ease-in-out infinite}
 @media(prefers-reduced-motion:reduce){body .prov .bar,body.noanim .prov .bar{animation:none}}
 @media(min-width:900px){.swc-bl{left:110px;bottom:18px}.swc-tl{left:110px;top:12px}.swc-br{bottom:18px}}
+.gcols{display:grid;gap:12px}@media(min-width:900px){.gcols{grid-template-columns:1fr 1fr}}
+.skl{font-size:12.5px;color:var(--mut);background:var(--bg);border-radius:8px;padding:6px 8px;margin:4px 0}
 </style></head><body><div id="app"></div>
 <nav class="bar" id="nav"></nav>
 
@@ -268,7 +270,7 @@ const f2=n=>(Math.round(n*100)/100).toLocaleString('id-ID');
 const fixP=t=>String(t).replace(/(^|[\s:.(])-(\d)/g,'$1kurangi $2').replace(/: 0(?=\s|\.|\(|$)/g,': skor 0');
 const LB=Object.fromEntries(CONFIG.lombas.map(l=>[l.id,l]));
 const COL=['var(--c1)','var(--c2)','var(--c3)'];
-let S={tab:'nilai',lomba:CONFIG.lombas[0].id,mitra:0,d:null,prof:ld('profil',{}),scores:{},col:null,dcol:null,drafts:{},mode:'lokal'};
+let S={tab:'nilai',lomba:CONFIG.lombas[0].id,mitra:0,d:null,prof:ld('profil',{}),scores:{},col:null,dcol:null,drafts:{},timers:{},off:0,mode:'lokal'};
 const docId=()=>`${S.lomba}__${S.mitra}__${slug(S.prof.name)||'anon'}`;
 const blank=()=>({waktu:'',fatal:'Tidak',khusus:0,ded:{},miss:{},notes:{},unit:'',urut:S.mitra+1});
 function openDraft(){const id=docId(),ex=S.scores[id],L=ld('dr:'+id,null),R=S.drafts[id];
@@ -285,7 +287,7 @@ function liveDocs(){if(S.demo)return Object.values(S.demoScores);const out={};Ob
   Object.entries(S.drafts).forEach(([id,d])=>{const p=id.split('__'),lb=p[0];if(!LB[lb]||d.same||norm(d)===BLANKN)return;const s=S.scores[id];if(s&&(s.ts||0)>=(d._t||0))return;
     out[id]={...d,lomba:lb,mitra:+p[1],judge:p[2],role:d.role||(s&&s.role)||undefined,prov:true,ts:d._t}});return Object.values(out)}
 function onDrafts(first){if(S.tab!=='nilai')return;const id=docId();if(first&&S.drafts[id]&&!ld('dr:'+id,null)&&!S.busy)renderNilai();else fillMitra()}
-const mark=i=>{const k=`${S.lomba}__${i}__${slug(S.prof.name)||'anon'}`;return S.scores[k]?' ✓':(S.drafts[k]||ld('dr:'+k,null))?' ✎ draf':''}
+const mark=i=>{const k=`${S.lomba}__${i}__${slug(S.prof.name)||'anon'}`,tt=S.timers[`${S.lomba}__${i}`],tw=tt&&(tt.status==='run'||tt.status==='pause')?' ⏱':'';return (S.scores[k]?' ✓':(S.drafts[k]||ld('dr:'+k,null))?' ✎ draf':'')+tw}
 const items=lb=>CONFIG.checklist.filter(c=>c.l==='*'||c.l===lb);
 const pct=(lb,t)=>{for(const [b,p] of LB[lb].skala)if(t<=b)return p;return 0};
 
@@ -321,39 +323,67 @@ let AC,warned={};
 function beep(n=1){try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();for(let i=0;i<n;i++){const o=AC.createOscillator(),g=AC.createGain();o.connect(g);g.connect(AC.destination);o.frequency.value=880;g.gain.value=.25;o.start(AC.currentTime+i*.3);o.stop(AC.currentTime+i*.3+.2)}navigator.vibrate&&navigator.vibrate(n*200)}catch(e){}}
 const fmt=ms=>{const s=Math.floor(Math.abs(ms)/1000);return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')};
 const fmtSw=ms=>{const t=Math.floor(Math.max(0,ms)/100),d=t%10,s=Math.floor(t/10)%60,m=Math.floor(t/600);return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0')+'.'+d};
-const SWK='sw',swGet=()=>{const a=ld(SWK,null);return a&&a.key?a:null},swMs=a=>a?a.acc+(a.run?Date.now()-a.start:0):0,swKey=()=>S.lomba+'__'+S.mitra;
-function swCard(role){const a=swGet(),mine=a&&a.key===swKey(),w=S.d&&S.d.waktu!==''&&S.d.waktu!=null;let txt,btn='';
-  if(a&&!mine)txt=`Stopwatch sedang berjalan untuk <b>${esc(a.name)}</b> (${esc(LB[a.lomba].short)}). Selesaikan dulu lewat pop-up.`;
-  else if(mine)txt=`Stopwatch ${a.run?'berjalan':'dijeda'}. Kontrolnya ada di pop-up melayang; tekan <b>Selesai</b> di sana saat pekerjaan tuntas.`;
-  else if(w){txt=`Waktu tercatat: <b>${esc(S.d.waktu)} menit</b>.`;btn='<button class="sec fix" data-sw="start">\u21ba Ulangi</button>'}
-  else{txt='Tekan <b>Mulai</b> saat peserta mulai bekerja. Stopwatch tampil melayang, bisa digeser ke sudut mana pun, dan waktunya otomatis masuk ke lembar nilai.';btn='<button class="ok fix" data-sw="start">\u25b6 Mulai</button>'}
-  return `<div class="card swcard"><div class="row"><div><b>\u23f1 Stopwatch</b><div class="mut">${txt}</div></div>${btn}</div></div>`}
-function swDo(kind){let a=swGet();
-  if(kind==='start'){const k=swKey();if(a&&a.key!==k)return alert('Selesaikan dulu stopwatch yang sedang berjalan.');
-    if(S.d&&S.d.waktu!==''&&S.d.waktu!=null&&!confirm('Ulangi stopwatch? Waktu tercatat akan diganti saat Anda menekan Selesai.'))return;
-    a={key:k,lomba:S.lomba,mitra:S.mitra,name:CONFIG.mitra[S.mitra],run:true,start:Date.now(),acc:0};delete warned[k+'w'];delete warned[k+'o'];sv(SWK,a);swPop();if(S.tab==='nilai')renderNilai();return}
-  if(!a)return;
-  if(kind==='pause'){if(a.run){a.acc=swMs(a);a.run=false}else{a.run=true;a.start=Date.now()}sv(SWK,a);swPop();return}
-  if(kind==='fin'){const m=Math.round(swMs(a)/600)/100;if(!confirm(`Hentikan stopwatch ${a.name} (${LB[a.lomba].short})?\nWaktu ${m} menit akan masuk ke lembar nilai.`))return;
-    rm(SWK);const p=$('#swpop');if(p)p.remove();S.lomba=a.lomba;S.mitra=a.mitra;openDraft();S.d.waktu=m;saveDraft();S.tab='nilai';render()}}
+/* ---------- stopwatch BERSAMA: satu stopwatch per (lomba + mitra), tersinkron lewat server ---------- */
+const srv=()=>Date.now()+S.off,tmKey=()=>S.lomba+'__'+S.mitra,tmGet=k=>{const t=S.timers[k];return t&&t.status&&t.status!=='idle'?t:null},
+  tmMs=t=>t?(t.acc||0)+(t.status==='run'?Math.max(0,srv()-t.start):0):0,
+  tmMe=()=>({id:slug(S.prof.name)||'anon',name:S.prof.name||'Juri'}),isMine=t=>!!t&&t.by===tmMe().id;
+/* aturan stopwatch (sama persis dengan di Code.gs): start | pause | resume | fin | take | reset */
+function tmReduce(o,a,u,now){o=o||{status:'idle',acc:0,v:0};const v=(o.v||0)+1,act=o.status==='run'||o.status==='pause',own=o.by===u.id,el=o.status==='run'?(o.acc||0)+now-o.start:(o.acc||0);
+  if(a==='start'){if(act&&!own)throw new Error('Stopwatch sudah dijalankan oleh '+o.byName+'.');if(act)return o;return {status:'run',start:now,acc:0,by:u.id,byName:u.name,v}}
+  if(a==='take'){if(!act)throw new Error('Stopwatch belum berjalan.');return {...o,by:u.id,byName:u.name,v}}
+  if(a==='reset'){return {status:'idle',acc:0,v}}
+  if(a==='pause'||a==='resume'||a==='fin'){if(!act)throw new Error('Stopwatch belum berjalan.');if(!own)throw new Error('Stopwatch sedang dipegang '+o.byName+'. Gunakan Ambil alih bila perlu.');
+    if(a==='pause')return o.status==='run'?{...o,status:'pause',acc:el,v}:o;
+    if(a==='resume')return o.status==='pause'?{...o,status:'run',start:now,v}:o;
+    return {status:'done',acc:el,min:Math.round(el/600)/100,by:o.by,byName:o.byName,end:now,v}}
+  throw new Error('Perintah stopwatch tidak dikenal.')}
+async function tmAct(a){const key=tmKey();let t;
+  if(API.on()){const j=await API.post({op:'timer',a,lomba:S.lomba,mitra:S.mitra});t=j.t;if(j.now)S.off=j.now-Date.now()}
+  else{t=tmReduce(S.timers[key],a,tmMe(),Date.now());sv('tmrs',S.timers)}
+  if(t){t._lt=Date.now();S.timers[key]=t;if(!API.on())sv('tmrs',S.timers)}return t}
+function swCardInner(){const k=tmKey(),t=tmGet(k),d=S.timers[k],nm=esc(CONFIG.mitra[S.mitra]),ls=esc(LB[S.lomba].short);let txt,btn='';
+  if(t){if(isMine(t))txt=`Anda memegang stopwatch ${t.status==='run'?'(berjalan)':'(dijeda)'}. Kontrolnya ada di pop-up melayang; tekan <b>Selesai</b> di sana saat pekerjaan tuntas. Semua juri yang menilai ${ls} · ${nm} melihat waktu yang sama.`;
+    else{txt=`Stopwatch dijalankan oleh <b>${esc(t.byName)}</b> dan tersinkron otomatis ke semua juri yang menilai ${ls} · ${nm}. Anda hanya melihat.`;btn='<button class="sec fix" data-sw="take">Ambil alih</button>'}}
+  else if(d&&d.status==='done'){txt=`Waktu resmi: <b>${d.min} menit</b> (dihentikan oleh ${esc(d.byName||'juri')}). Otomatis masuk ke lembar nilai semua juri teknis.`;btn='<button class="sec fix" data-sw="start">↺ Ulangi</button>'}
+  else{txt='Belum ada stopwatch untuk mitra ini. Cukup satu juri yang menekan <b>Mulai</b>; stopwatch otomatis muncul di halaman semua juri yang menilai lomba dan mitra yang sama, dan hasil waktunya sama untuk semua.';btn='<button class="ok fix" data-sw="start">▶ Mulai</button>'}
+  return `<div class="row"><div><b>⏱ Stopwatch bersama</b><div class="mut">${txt}</div></div>${btn}</div>`}
+const swCard=()=>`<div class="card swcard" id="swc">${swCardInner()}</div>`;
+async function swDo(kind){const key=tmKey(),t=tmGet(key),d=S.timers[key],L=LB[S.lomba],nm=CONFIG.mitra[S.mitra];
+  try{
+    if(kind==='start'){if(d&&d.status==='done'&&!confirm('Ulangi stopwatch? Waktu resmi sebelumnya ('+d.min+' menit) akan dihapus untuk semua juri.'))return;await tmAct('start')}
+    else if(kind==='fin'){if(!t)return;const m=Math.round(tmMs(t)/600)/100;if(!confirm(`Hentikan stopwatch ${nm} (${L.short})?\nWaktu ${m} menit akan masuk ke lembar nilai semua juri teknis yang menilai mitra ini.`))return;await tmAct('fin')}
+    else if(kind==='take'){if(!t)return;if(!confirm('Ambil alih stopwatch dari '+t.byName+'? Hanya Anda yang bisa menjeda/menghentikannya.'))return;await tmAct('take')}
+    else if(kind==='toggle'){if(!t)return;await tmAct(t.status==='run'?'pause':'resume')}
+  }catch(e){alert(e.message||'Gagal menjalankan stopwatch');await pullT()}
+  onTimers(true);swPop()}
 function swDrag(e){const h=e.querySelector('.swh');let dr=null;
   h.onpointerdown=ev=>{const r=e.getBoundingClientRect();dr={dx:ev.clientX-r.left,dy:ev.clientY-r.top};h.setPointerCapture(ev.pointerId);e.className=e.className.replace(/ ?swc-\w+/,'')+' drag';e.style.left=r.left+'px';e.style.top=r.top+'px'};
   h.onpointermove=ev=>{if(!dr)return;e.style.left=Math.max(0,Math.min(innerWidth-e.offsetWidth,ev.clientX-dr.dx))+'px';e.style.top=Math.max(0,Math.min(innerHeight-e.offsetHeight,ev.clientY-dr.dy))+'px'};
   h.onpointerup=h.onpointercancel=()=>{if(!dr)return;dr=null;const r=e.getBoundingClientRect(),c=(r.left+r.width/2<innerWidth/2?'l':'r'),v=(r.top+r.height/2<innerHeight/2?'t':'b');sv('swc',v+c);e.style.left=e.style.top='';e.className=e.className.replace(' drag','')+' swc-'+v+c}}
-function swPop(){const a=swGet();let e=$('#swpop');
-  if(!a){if(e)e.remove();return}
+function swPop(){let e=$('#swpop');const k=tmKey(),t=(S.tab==='nilai'&&authOk()&&S.prof.role)?tmGet(k):null;
+  if(!t){if(e)e.remove();return}
+  const mine=isMine(t),sig=t.status+'|'+mine;
   if(!e){e=document.createElement('div');e.id='swpop';e.className='swpop swc-'+ld('swc','bl');
-    e.innerHTML='<div class="swh"><span>\u23f1 Stopwatch</span><span>\u283f geser</span></div><div class="swn"></div><div class="swt">00:00.0</div><div class="swl"></div><div class="row" style="margin-top:6px"><button data-sw="pause">Jeda</button><button class="warn" data-sw="fin">Selesai</button></div>';
+    e.innerHTML='<div class="swh"><span>⏱ Stopwatch</span><span>⠿ geser</span></div><div class="swn"></div><div class="swt">00:00.0</div><div class="swl"></div><div class="row" style="margin-top:6px"></div>';
     document.body.appendChild(e);swDrag(e)}
-  const ms=swMs(a),lim=LB[a.lomba].batas*60000,rem=lim-ms;
-  e.querySelector('.swn').textContent=a.name+' \u00b7 '+LB[a.lomba].short;e.querySelector('.swt').textContent=fmtSw(ms);
-  e.querySelector('.swl').textContent=rem>=0?`batas ${LB[a.lomba].batas} menit \u00b7 sisa ${fmt(rem)}`:`lewat batas ${fmt(-rem)}`;
-  e.querySelector('[data-sw=pause]').textContent=a.run?'Jeda':'Lanjut';e.classList.toggle('w',rem>0&&rem<=300000);e.classList.toggle('o',rem<=0);
-  if(a.run){const k=a.key;if(rem<=300000&&rem>0&&!warned[k+'w']){warned[k+'w']=1;beep(1)}if(rem<=0&&!warned[k+'o']){warned[k+'o']=1;beep(3)}}}
+  if(e.dataset.sig!==sig){e.dataset.sig=sig;e.querySelector('.row').innerHTML=mine?`<button data-sw="toggle">${t.status==='run'?'Jeda':'Lanjut'}</button><button class="warn" data-sw="fin">Selesai</button>`:'<button class="sec" data-sw="take">Ambil alih</button>'}
+  const ms=tmMs(t),L=LB[S.lomba],rem=L.batas*60000-ms;
+  e.querySelector('.swn').textContent=CONFIG.mitra[S.mitra]+' · '+L.short;e.querySelector('.swt').textContent=fmtSw(ms);
+  e.querySelector('.swl').textContent=(rem>=0?`batas ${L.batas} menit · sisa ${fmt(rem)}`:`lewat batas ${fmt(-rem)}`)+(mine?'':' · dipegang '+t.byName);
+  e.classList.toggle('w',rem>0&&rem<=300000);e.classList.toggle('o',rem<=0);
+  if(t.status==='run'){const kk=k+'|'+t.start;if(rem<=300000&&rem>0&&!warned[kk+'w']){warned[kk+'w']=1;beep(1)}if(rem<=0&&!warned[kk+'o']){warned[kk+'o']=1;beep(3)}}}
 setInterval(swPop,200);
+/* waktu resmi dari stopwatch bersama otomatis masuk ke lembar juri teknis */
+function syncWaktu(){if(S.tab!=='nilai'||!S.d||S.prof.role!=='teknis')return;const t=S.timers[tmKey()],i=$('[data-f=waktu]');if(!i)return;
+  if(t&&t.status==='done'&&t.min!=null){i.readOnly=true;if(S.d.waktu===''||+S.d.waktu!==t.min){S.d.waktu=t.min;i.value=t.min;upd()}}else i.readOnly=false}
+function onTimers(force){if(S.tab!=='nilai'||!authOk())return;const k=tmKey(),t=S.timers[k]||{},sig=[t.status,t.v,t.by,t.min].join(),c=$('#swc');
+  if(force||S.tsig!==sig){S.tsig=sig;if(c)c.innerHTML=swCardInner();syncWaktu()}
+  const ms=Object.entries(S.timers).filter(([_,x])=>x.status==='run'||x.status==='pause').map(([q,x])=>q+x.v).join();if(ms!==S.msig){S.msig=ms;if(!S.busy)fillMitra()}}
+function mergeT(n){n=n||{};const o=S.timers,out={};Object.keys(n).forEach(k=>{const l=o[k];out[k]=(l&&(l.v||0)>(n[k].v||0)&&Date.now()-(l._lt||0)<8000)?l:n[k]});Object.keys(o).forEach(k=>{if(!(k in n)&&Date.now()-(o[k]._lt||0)<8000)out[k]=o[k]});S.timers=out}
+async function pullT(){if(!API.on())return;try{const t0=Date.now(),j=await API.get('?t=1'),t1=Date.now();if(j.now)S.off=j.now-(t0+t1)/2;mergeT(j.timers);onTimers()}catch(e){}}
 /* ---------- penyimpanan bersama ---------- */
 const API={on:()=>!!CONFIG.apiUrl,
-  async get(){const r=await fetch(CONFIG.apiUrl,{cache:'no-store'});return r.json()},
+  async get(q){const r=await fetch(CONFIG.apiUrl+(q||''),{cache:'no-store'});return r.json()},
   async post(o,adm){const r=await fetch(CONFIG.apiUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({...o,token:adm?S.atok:S.prof.token})});const j=await r.json();
     if(!j.ok){if(j.code==='auth'){if(adm)S.atok='';else{S.prof.token='';sv('profil',S.prof)}}throw new Error(j.err||'gagal')}return j},
   set(col,id,data){return this.post({op:'set',col,id,data})},del(col,ids,adm){return this.post({op:'del',col,ids},adm)}};
@@ -361,9 +391,9 @@ const API={on:()=>!!CONFIG.apiUrl,
 const authOk=()=>!API.on()||!!(S.prof.token&&S.prof.exp>Date.now());
 const allowL=()=>{if(!API.on()||!authOk())return CONFIG.lombas;const a=S.prof.lomba||[];return CONFIG.lombas.filter(l=>a.includes(l.id))};
 function ensureL(){const a=allowL();if(a.length&&!a.some(l=>l.id===S.lomba))S.lomba=a[0].id}
-async function pull(){try{const j=await API.get();S.scores=j.scores||{};const first=!S.dloaded;S.dloaded=1;S.drafts=j.drafts||{};S.mode='terhubung server';onScores();onDrafts(first)}catch(e){S.mode='server gagal';const m=$('#mode');if(m)m.textContent=S.mode}}
-async function initDb(){if(!API.on()){S.mode='lokal';S.scores=ld('scores',{});onScores();return}
-  S.col=true;S.dcol=true;await pull();(function loop(){setTimeout(async()=>{if(!document.hidden&&!S.busy)await pull();loop()},S.tab==='live'?2500:7000)})()}
+async function pull(){try{const t0=Date.now(),j=await API.get(),t1=Date.now();if(j.now)S.off=j.now-(t0+t1)/2;S.scores=j.scores||{};const first=!S.dloaded;S.dloaded=1;S.drafts=j.drafts||{};mergeT(j.timers);S.mode='terhubung server';onScores();onDrafts(first);onTimers()}catch(e){S.mode='server gagal';const m=$('#mode');if(m)m.textContent=S.mode}}
+async function initDb(){if(!API.on()){S.mode='lokal';S.scores=ld('scores',{});S.timers=ld('tmrs',{});onScores();return}
+  S.col=true;S.dcol=true;await pull();(function tl(){setTimeout(async()=>{if(!document.hidden&&S.tab==='nilai'&&authOk()&&!S.busy)await pullT();tl()},tmGet(tmKey())?2500:4000)})();(function loop(){setTimeout(async()=>{if(!document.hidden&&!S.busy)await pull();loop()},S.tab==='live'?2500:7000)})()}
 async function syncJuri(){if(!S.col||!S.prof.name)return;try{await API.set('juri',slug(S.prof.name),{name:S.prof.name,role:S.prof.role,foto:S.prof.foto,ttd:S.prof.ttd,ts:S.prof.ts});S.prof.synced=1;sv('profil',S.prof)}catch(e){}}
 function onScores(){const b=$('#mode');if(b)b.textContent=S.mode;const lu=$('#lu');if(lu)lu.textContent=new Date().toLocaleTimeString('id-ID');if(S.tab==='live'&&sigLive()!==S.lsig)renderLive();if(S.tab==='nilai'&&!S.busy)fillMitra()}
 async function saveDoc(doc){const id=docId();if(S.col){await API.set('scores',id,doc);S.scores[id]=doc}else{const all=ld('scores',{});all[id]=doc;sv('scores',all);S.scores=all}}
@@ -378,13 +408,13 @@ function render(){document.body.dataset.v=S.tab;if(S.tab!=='live')S.liveSeen=fal
 function renderNilai(){
   stopCam();ensureL();const role=S.prof.role;
   if(!authOk()){$('#app').innerHTML=head()+`<div class="card"><h2>Masuk dulu</h2><p class="mut">Penilaian hanya untuk juri yang punya akun (dibuat oleh admin/pengawas). Live Score tetap bisa dilihat siapa saja. Masuk lewat menu Profil Juri.</p><button data-tab="profil" style="width:100%">Buka Profil Juri</button></div>`;return}
-  if(API.on()&&!allowL().length){$('#app').innerHTML=head()+`<div class="card"><h2>Belum ada tugas lomba</h2><p class="mut">Akun Anda belum ditugaskan ke lomba mana pun. Hubungi admin/pengawas.</p></div>`;return}
+  if(API.on()&&!allowL().length){$('#app').innerHTML=head()+`<div class="card"><h2>Pilih lomba dulu</h2><p class="mut">Anda belum memilih lomba. Simpan Profil Juri (foto dan tanda tangan), lalu pilih lomba yang akan Anda nilai. Hanya lomba yang Anda pilih yang muncul di sini.</p><button data-tab="profil" style="width:100%">Buka Profil Juri</button></div>`;return}
   if(!role){$('#app').innerHTML=head()+`<div class="card"><h2>Pilih jenis juri dulu</h2><p class="mut">Sebelum menilai, tentukan apakah Anda <b>Juri K3</b> atau <b>Juri Teknis</b> di menu Profil Juri. Juri K3 hanya menilai K3, keselamatan, dan APD; Juri Teknis hanya menilai sisi teknis.</p><button data-tab="profil" style="width:100%">Buka Profil Juri</button></div>`;return}
-  openDraft();const rub=RUBRIK[S.lomba],d=S.d,own=r=>ownR(r,role),asps=[...new Set(rub.filter(own).map(r=>r.a))],R=ROLES[role];
+  openDraft();S.tsig=null;const T0=S.timers[tmKey()],tdn=!!(T0&&T0.status==='done'&&T0.min!=null);if(tdn&&role==='teknis')S.d.waktu=T0.min;const rub=RUBRIK[S.lomba],d=S.d,own=r=>ownR(r,role),asps=[...new Set(rub.filter(own).map(r=>r.a))],R=ROLES[role];
   const sent=S.scores[docId()];
-  let h=head()+swCard(role)+(S.prof.name&&S.prof.foto&&S.prof.ttd?'':`<div class="warnbox">Lengkapi <b>Profil Juri</b> (nama, foto kamera, tanda tangan) sebelum mengirim nilai.</div>`);
+  let h=head()+swCard()+(S.prof.name&&S.prof.foto&&S.prof.ttd?'':`<div class="warnbox">Lengkapi <b>Profil Juri</b> (nama, foto kamera, tanda tangan) sebelum mengirim nilai.</div>`);
   h+=`<div class="nl-top"><div>${picker()}</div><div><div class="card rolecard"><div class="row"><b style="font-size:17px">${R.i} ${R.n}</b><span class="fix mut">bobot ${f2(wRole(role))} dari 100</span></div><div class="mut">${R.d}. ${role==='k3'?'Nilai K3 Anda otomatis ditambahkan ke nilai setiap juri teknis. Waktu dan aspek teknis tidak perlu diisi.':'Nilai K3 diambil otomatis dari Juri K3 dan digabung ke nilai Anda, sehingga total tetap 100. Aspek K3 tidak perlu diisi.'}</div></div>`
-   +(role==='teknis'?`<div class="card"><label style="margin-top:0">Waktu penyelesaian aktual (menit)</label><input data-f="waktu" type="number" inputmode="decimal" step="0.01" value="${esc(d.waktu)}"></div>`:'')+`</div></div>`;
+   +(role==='teknis'?`<div class="card"><label style="margin-top:0">Waktu penyelesaian aktual (menit)</label><input data-f="waktu" type="number" inputmode="decimal" step="0.01" value="${esc(d.waktu)}" ${tdn?'readonly':''}><div class="mut">Terisi otomatis dari stopwatch bersama saat dihentikan (terkunci, sama untuk semua juri). Bila tidak ada stopwatch, isi manual.</div></div>`:'')+`</div></div>`;
   const bl=[],cks=[...new Set(items(S.lomba).filter(c=>ownC(c.k,role)).map(c=>c.k))];
   let b0=`<details class="as"><summary><span>${role==='k3'?'Checklist APD & alat pengaman':'Checklist alat kerja & material'}</span><span class="sc" id="ckSum"></span></summary>`;
   cks.forEach(k=>{b0+=`<div class="sub"><h3>${esc(k)}</h3>`+items(S.lomba).filter(c=>c.k===k).map(c=>`<div class="ci"><div>${esc(c.n)}${c.q>1?' ×'+c.q:''}<br><small>${esc(c.s)}</small></div><div class="seg" data-chk="${esc(c.n)}"><button class="y ${d.miss[c.n]?'':'on'}" data-v="0">Ada</button><button class="n ${d.miss[c.n]?'on':''}" data-v="1">Tidak ada</button></div></div>`).join('')+'</div>'});
@@ -457,24 +487,36 @@ function makeDemo(){
   return out}
 /* ---------- admin (PIN di CONFIG.adminPin) ---------- */
 async function adminOpen(){if(API.on()){const p=prompt('PIN admin / pengawas');if(p===null)return;try{const j=await API.post({op:'admin.login',pin:p.trim()});S.atok=j.token}catch(e){return alert(e.message||'PIN salah.')}}renderAdmin()}
+function guideInner(){const lb=S.gl||CONFIG.lombas[0].id,L=LB[lb],rub=RUBRIK[lb],last=L.skala[L.skala.length-1][0];
+  const skl=`<div class="skl">Skala skor waktu (batas ${L.batas} menit): ${L.skala.map(([b,p])=>`≤ ${b} menit = ${Math.round(p*100)}% bobot`).join(' · ')} · lebih dari ${last} menit = 0.</div>`;
+  const sec=role=>{const R=ROLES[role],asps=[...new Set(rub.filter(r=>ownR(r,role)).map(r=>r.a))];
+    let h=`<div><div class="card rolecard"><div class="row"><b style="font-size:17px">${R.i} ${R.n}</b><span class="fix mut">bobot ${f2(wRole(role))} dari 100</span></div><div class="mut">${R.d}</div></div>`;
+    asps.forEach(a=>{const rows=rub.filter(r=>r.a===a&&ownR(r,role));
+      h+=`<details class="as"><summary><span>${esc(a)}</span><span class="sc">${f2(rows.reduce((p,r)=>p+r.b,0))}</span></summary>`+rows.map(r=>`<div class="sub"><div class="row"><h3>${esc(r.s)}</h3><span class="fix mut">bobot ${f2(r.b)}</span></div><p>${esc(r.k)}</p><p><b>Ketentuan pengurangan:</b> ${esc(fixP(r.p))}</p>${r.auto?skl:''}</div>`).join('')+'</details>'});
+    const cks=[...new Set(items(lb).filter(c=>ownC(c.k,role)).map(c=>c.k))];
+    h+=`<details class="as"><summary><span>${role==='k3'?'Checklist APD & alat pengaman':'Checklist alat kerja & material'}</span><span class="mut">otomatis</span></summary>`+cks.map(k=>{const sub=Object.entries(CONFIG.mapKategori).find(([,v])=>v===k);return `<div class="sub"><h3>${esc(k)}</h3><p class="mut">Tiap item “Tidak ada” mengurangi ${f2(CONFIG.penaltyPerItem)} poin${sub?' pada sub aspek “'+esc(sub[0])+'”':''}.</p>`+items(lb).filter(c=>c.k===k).map(c=>`<div class="ci"><div>${esc(c.n)}${c.q>1?' ×'+c.q:''}<br><small>${esc(c.s)}</small></div></div>`).join('')+'</div>'}).join('')+'</details></div>';
+    return h};
+  return `<h3>Panduan penilaian: Juri K3 &amp; Juri Teknis</h3><p class="mut">Halaman baca-saja untuk memberi pemahaman kepada juri. Nilai satu lomba = nilai Juri K3 + nilai Juri Teknis (total 100). Pelanggaran fatal = nilai 0; pengurangan khusus dipotong dari nilai bagian juri.</p><div class="chips">${CONFIG.lombas.map(l=>`<button class="chip ${l.id===lb?'on':''}" data-gl="${l.id}">${esc(l.short)}</button>`).join('')}</div><div class="mut" style="margin:6px 0">${esc(L.nama)}</div><div class="gcols">${sec('k3')}${sec('teknis')}</div>`}
 async function renderAdmin(){stopCam();document.body.dataset.v='admin';
   const sc=Object.values(S.scores),js=[...new Map(sc.map(s=>[s.judge,s.judgeName]))],AU=API.on();
   const B=(k,v,t,c='warn')=>`<button class="${c}" style="width:100%;margin:4px 0" data-adm="${k}" data-v="${esc(v||'')}">${t}</button>`;
   let users=null,uerr='';if(AU){try{users=(await API.post({op:'user.list'},true)).users}catch(e){uerr=e.message||'gagal'}}
   const RN={k3:'Juri K3',teknis:'Juri Teknis'};
-  const ulist=!AU?'<p class="mut">Akun juri hanya tersedia saat website terhubung ke server (apiUrl terisi).</p>':users?(users.length?users.map(u=>`<div class="ci"><div><b>${esc(u.name)}</b><br><small>${RN[u.role]||u.role} · ${u.lomba.map(id=>esc(LB[id]?LB[id].short:id)).join(', ')}</small></div><div style="display:flex;gap:6px"><button class="sec" data-adm="upin" data-v="${esc(u.id)}">Reset PIN</button><button class="warn" data-adm="udel" data-v="${esc(u.id)}">Hapus</button></div></div>`).join(''):'<p class="mut">Belum ada akun juri.</p>'):`<p class="bad">${esc(uerr)} Kembali lalu masuk admin lagi.</p>`;
-  const form=AU&&users?`<h3 style="margin-top:14px">Buat akun juri baru</h3><label>Nama juri (dipakai untuk masuk)</label><input id="un" autocomplete="off"><label>Jenis juri</label><select id="ur"><option value="k3">Juri K3</option><option value="teknis">Juri Teknis</option></select><label>Bertugas di lomba (juri hanya bisa menilai lomba ini)</label><div class="chips">${CONFIG.lombas.map(l=>`<label class="chip" style="display:flex;gap:6px;align-items:center;margin:0"><input type="checkbox" class="ul" value="${l.id}" style="width:auto;min-height:0"> ${esc(l.short)}</label>`).join('')}</div><label>PIN 4–8 angka (kosongkan = dibuat acak)</label><input id="up" inputmode="numeric" autocomplete="off"><button class="ok" data-adm="uadd" style="width:100%;margin-top:8px">Buat akun</button>`:'';
+  const ulist=!AU?'<p class="mut">Akun juri hanya tersedia saat website terhubung ke server (apiUrl terisi).</p>':users?(users.length?users.map(u=>`<div class="ci"><div><b>${esc(u.name)}</b><br><small>${RN[u.role]||u.role} · ${(u.lomba&&u.lomba.length)?'lomba pilihan juri: '+u.lomba.map(id=>esc(LB[id]?LB[id].short:id)).join(', '):'belum memilih lomba'}</small></div><div style="display:flex;gap:6px"><button class="sec" data-adm="upin" data-v="${esc(u.id)}">Reset PIN</button><button class="warn" data-adm="udel" data-v="${esc(u.id)}">Hapus</button></div></div>`).join(''):'<p class="mut">Belum ada akun juri.</p>'):`<p class="bad">${esc(uerr)} Kembali lalu masuk admin lagi.</p>`;
+  const form=AU&&users?`<h3 style="margin-top:14px">Buat akun juri baru</h3><label>Nama juri (dipakai untuk masuk)</label><input id="un" autocomplete="off"><label>Jenis juri</label><select id="ur"><option value="k3">Juri K3</option><option value="teknis">Juri Teknis</option></select><p class="mut">Lomba tidak ditentukan di sini: juri memilih sendiri lomba yang dinilai di menu Profil Juri setelah menyimpan profilnya.</p><label>PIN 4–8 angka (kosongkan = dibuat acak)</label><input id="up" inputmode="numeric" autocomplete="off"><button class="ok" data-adm="uadd" style="width:100%;margin-top:8px">Buat akun</button>`:'';
   $('#app').innerHTML=head()+`<div class="row" style="margin-bottom:10px"><button class="sec" data-act="admback">← Kembali</button>${AU?'<button class="sec" data-adm="alogout">Keluar admin</button>':''}</div><div class="card"><h2>Admin / Pengawas</h2><div class="mut">${sc.length} lembar nilai terkirim · ${Object.keys(S.drafts).length} draf di server · ${js.length} juri sudah mengirim · mode ${S.mode}</div></div>
   <div class="card"><h3>Akun juri</h3>${ulist}${form}</div>
+  <div class="card" id="guide">${guideInner()}</div>
   <div class="card"><h3>Hapus nilai terkirim</h3>${CONFIG.lombas.map(l=>B('lomba',l.id,'Hapus semua nilai '+esc(l.short))).join('')}${js.map(([k,n])=>B('judge',k,'Hapus nilai juri: '+esc(n))).join('')}${B('all','','HAPUS SEMUA NILAI')}</div>
-  <div class="card"><h3>Draf &amp; data HP ini</h3>${B('drafts','','Hapus semua draf di server','sec')}${B('local','','Reset data di HP ini (draf, timer, profil)','sec')}</div>`}
+  <div class="card"><h3>Draf &amp; data HP ini</h3>${B('drafts','','Hapus semua draf di server','sec')}${B('timers','','Reset semua stopwatch bersama','sec')}${B('local','','Reset data di HP ini (draf, timer, profil)','sec')}</div>`}
 async function admAct(k,v){
   if(k==='alogout'){S.atok='';S.tab='profil';return render()}
-  if(k==='uadd'){const name=$('#un').value.trim(),role=$('#ur').value,lomba=$$('.ul:checked').map(x=>x.value),pin=$('#up').value.trim();
-    if(!name)return alert('Isi nama juri.');if(!lomba.length)return alert('Pilih minimal satu lomba.');
-    try{const j=await API.post({op:'user.add',name,role,lomba,pin},true);alert(`Akun dibuat.\nNama masuk: ${j.user.name}\nPIN: ${j.pin}\n\nCatat dan berikan PIN ini ke juri. PIN tidak bisa dilihat lagi (hanya bisa direset).`)}catch(e){alert('Gagal: '+(e.message||e))}return renderAdmin()}
+  if(k==='uadd'){const name=$('#un').value.trim(),role=$('#ur').value,pin=$('#up').value.trim();
+    if(!name)return alert('Isi nama juri.');
+    try{const j=await API.post({op:'user.add',name,role,pin},true);alert(`Akun dibuat.\nNama masuk: ${j.user.name}\nPIN: ${j.pin}\n\nCatat dan berikan PIN ini ke juri. PIN tidak bisa dilihat lagi (hanya bisa direset).`)}catch(e){alert('Gagal: '+(e.message||e))}return renderAdmin()}
   if(k==='udel'){if(!confirm('Hapus akun juri ini? Juri tidak bisa masuk lagi. Nilai yang sudah dikirim tetap ada.'))return;try{await API.post({op:'user.del',id:v},true)}catch(e){alert('Gagal: '+(e.message||e))}return renderAdmin()}
   if(k==='upin'){const pin=prompt('PIN baru 4–8 angka (kosongkan = acak):');if(pin===null)return;try{const j=await API.post({op:'user.pin',id:v,pin:pin.trim()},true);alert('PIN baru: '+j.pin+'\nBerikan ke juri yang bersangkutan.')}catch(e){alert('Gagal: '+(e.message||e))}return}
+  if(k==='timers'){const ids=Object.keys(S.timers);if(!ids.length)return alert('Tidak ada stopwatch.');if(!confirm(`Reset ${ids.length} stopwatch bersama? Waktu resmi yang tersimpan ikut terhapus.`))return;try{if(S.col)await API.del('timers',ids,true);S.timers={};alert('Stopwatch di-reset.')}catch(e){alert('Gagal: '+(e.message||e))}return}
   if(k==='drafts'){const ids=Object.keys(S.drafts);if(!ids.length)return alert('Tidak ada draf.');if(!confirm(`Hapus ${ids.length} draf di server?`))return;
     try{if(S.dcol)await API.del('drafts',ids,true)}catch(e){alert('Gagal: '+(e.message||e))}return setTimeout(renderAdmin,600)}
   if(k==='local'){if(!confirm('Hapus draf, timer, dan profil juri (foto, tanda tangan) di HP ini?'))return;Object.keys(localStorage).filter(x=>/^(dr:|tm:|profil|scores)/.test(x)).forEach(rm);S.prof={};S.tab='nilai';return render()}
@@ -524,16 +566,18 @@ function renderDetail(){
   $('#app').innerHTML=h}
 /* ---------- profil juri: foto kamera + tanda tangan ---------- */
 let stream;const stopCam=()=>{stream&&stream.getTracks().forEach(t=>t.stop());stream=null};
+function lombaCard(p){const sel=p.lomba||[],ok=!!(p.foto&&p.ttd);
+  return `<div class="card" style="margin-top:10px"><h3>Pilih lomba yang Anda nilai</h3>`+(ok?`<p class="mut">Centang lomba yang akan Anda nilai. Hanya lomba yang dipilih yang muncul di menu Nilai. Lomba yang sudah Anda kirimi nilai tidak bisa dilepas.</p><div class="chips">${CONFIG.lombas.map(l=>`<label class="chip ${sel.includes(l.id)?'on':''}" style="display:flex;gap:6px;align-items:center;margin:0"><input type="checkbox" class="jl" value="${l.id}" ${sel.includes(l.id)?'checked':''} style="width:auto;min-height:0"> ${esc(l.nama)}</label>`).join('')}</div><button class="ok" data-p="lomba" style="width:100%;margin-top:8px">Simpan pilihan lomba</button>`:`<p class="mut">Simpan profil juri (nama, foto kamera, tanda tangan) dulu. Setelah itu pilihan lomba muncul di sini.</p>`)+`</div>`}
 function renderProfil(){const p=S.prof,AU=API.on();S.roleSel=S.roleSel||p.role||'';if(AU&&!authOk())return renderLogin();
   const lock=!!p.role&&Object.values(S.scores).some(s=>s.judge===slug(p.name));
   const rb=k=>`<button class="rolebtn ${S.roleSel===k?'on':''}" data-role="${k}" ${lock?'data-lock="1"':''}><b>${ROLES[k].i} ${ROLES[k].n}</b><small>${ROLES[k].d}<br>bobot ${f2(wRole(k))} dari 100</small></button>`;
-  const WHO=`<div class="card rolecard" style="margin:0 0 8px"><b style="font-size:18px">${ROLES[p.role]?ROLES[p.role].i:''} ${esc(p.name||'')}</b><div class="mut">${ROLES[p.role]?ROLES[p.role].n:''} · bertugas di: ${(p.lomba||[]).map(id=>esc(LB[id]?LB[id].short:id)).join(', ')||'belum ditugaskan'}</div><div class="mut">Nama, jenis juri, dan lomba diatur oleh admin dan tidak bisa diubah di sini.</div><button class="sec" data-p="logout" style="margin-top:8px">Keluar akun</button></div>`;
+  const WHO=`<div class="card rolecard" style="margin:0 0 8px"><b style="font-size:18px">${ROLES[p.role]?ROLES[p.role].i:''} ${esc(p.name||'')}</b><div class="mut">${ROLES[p.role]?ROLES[p.role].n:''} · lomba pilihan Anda: ${(p.lomba||[]).map(id=>esc(LB[id]?LB[id].short:id)).join(', ')||'belum memilih'}</div><div class="mut">Nama dan jenis juri diatur oleh admin. Lomba yang dinilai Anda pilih sendiri di bawah.</div><button class="sec" data-p="logout" style="margin-top:8px">Keluar akun</button></div>`;
   $('#app').innerHTML=head()+`<div class="card pf"><div class="pfL">${AU?WHO:`<label>Nama juri</label><input id="jn" value="${esc(p.name||'')}" placeholder="Nama lengkap">
   <label>Jenis juri (wajib dipilih)</label><div class="roles">${rb('k3')}${rb('teknis')}</div><p class="mut">${lock?'Jenis juri terkunci karena nilai sudah dikirim. Untuk mengubahnya, minta admin menghapus nilai Anda.':'Juri K3 hanya bisa menilai K3, keselamatan, dan APD. Juri Teknis hanya bisa menilai sisi teknis. Pilihan terkunci setelah Anda mengirim nilai pertama.'}</p>`}
   <label>Foto wajah (wajib ambil langsung dari kamera)</label>${p.foto?`<img class="foto" id="fimg" src="${p.foto}">`:'<video id="vid" playsinline muted style="display:none"></video><img class="foto" id="fimg" style="display:none">'}
   <div class="row"><button class="sec" data-p="cam">${p.foto?'Ambil ulang foto':'Buka kamera'}</button><button data-p="snap" id="snap" style="display:none">Ambil foto</button></div>
   <p class="mut" id="cmsg"></p></div><div class="pfR"><label>Tanda tangan digital</label><canvas class="pad" id="pad" width="600" height="300"></canvas>
-  <div class="row" style="margin-top:6px"><button class="sec" data-p="clr">Hapus tanda tangan</button><button class="ok" data-p="save">Simpan profil</button></div></div></div><button class="sec" data-act="admin" style="width:100%">🔒 Admin</button>`;
+  <div class="row" style="margin-top:6px"><button class="sec" data-p="clr">Hapus tanda tangan</button><button class="ok" data-p="save">Simpan profil</button></div></div></div><button class="sec" data-act="admin" style="width:100%">🔒 Admin</button>`.replace('<button class="sec" data-act="admin"',(AU?lombaCard(p):'')+'<button class="sec" data-act="admin"');
   const cv=$('#pad'),cx=cv.getContext('2d');cx.lineWidth=5;cx.lineCap='round';cx.strokeStyle='#10222e';
   if(p.ttd){const im=new Image();im.onload=()=>cx.drawImage(im,0,0,600,300);im.src=p.ttd}
   let dn=false;const pt=e=>{const r=cv.getBoundingClientRect();return [(e.clientX-r.left)*600/r.width,(e.clientY-r.top)*300/r.height]};
@@ -544,6 +588,8 @@ async function pact(a){
   if(a==='login'){const n=($('#lu_n').value||'').trim(),pin=($('#lu_p').value||'').trim();if(!n||!pin)return alert('Isi nama dan PIN.');
     try{const j=await API.post({op:'login',name:n,pin});const u=j.user,old=S.prof.id===u.id?S.prof:{};S.prof={id:u.id,name:u.name,role:u.role,lomba:u.lomba,token:j.token,exp:j.exp,foto:old.foto,ttd:old.ttd,ts:old.ts};sv('profil',S.prof);S.roleSel=u.role;render()}catch(e){alert(e.message||'Gagal masuk')}return}
   if(a==='logout'){if(!confirm('Keluar dari akun ini? Foto dan tanda tangan di HP ini ikut dihapus.'))return;S.prof={};rm('profil');S.tab='profil';render();return}
+  if(a==='lomba'){const lomba=$$('.jl:checked').map(x=>x.value);if(!lomba.length)return alert('Pilih minimal satu lomba.');
+    try{if(S.col&&!S.prof.synced)await syncJuri();const j=await API.post({op:'lomba.set',lomba});S.prof.lomba=j.user.lomba;sv('profil',S.prof);ensureL();alert('Pilihan lomba tersimpan.');S.tab='nilai';render()}catch(e){alert(e.message||'Gagal menyimpan pilihan lomba')}return}
   const msg=$('#cmsg');
   if(a==='cam'){try{stopCam();stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:false});
     let v=$('#vid');if(!v){const o=$('#fimg');v=document.createElement('video');v.id='vid';v.setAttribute('playsinline','');v.muted=true;o.replaceWith(v);const i=document.createElement('img');i.id='fimg';i.className='foto';i.style.display='none';v.after(i)}
@@ -554,7 +600,7 @@ async function pact(a){
     S.foto=c.toDataURL('image/jpeg',.65);const im=$('#fimg');im.src=S.foto;im.style.display='block';v.style.display='none';stopCam();$('#snap').style.display='none'}
   if(a==='clr'){const cv=$('#pad');cv.getContext('2d').clearRect(0,0,600,300);S.sig=false}
   if(a==='save'){const AU=API.on(),n=AU?S.prof.name:$('#jn').value.trim();if(!n)return alert('Isi nama juri.');const foto=S.foto||S.prof.foto;if(!foto)return alert('Ambil foto wajah dengan kamera.');if(!S.sig)return alert('Tanda tangan dulu.');const role=AU?S.prof.role:(S.prof.role&&Object.values(S.scores).some(s=>s.judge===slug(S.prof.name))?S.prof.role:S.roleSel);if(!role)return alert('Pilih jenis juri: Juri K3 atau Juri Teknis.');
-    S.prof={...S.prof,name:n,role,foto,ttd:$('#pad').toDataURL('image/png'),ts:Date.now(),synced:0};sv('profil',S.prof);S.foto=null;syncJuri();alert('Profil juri tersimpan.');S.tab='nilai';render()}}
+    S.prof={...S.prof,name:n,role,foto,ttd:$('#pad').toDataURL('image/png'),ts:Date.now(),synced:0};sv('profil',S.prof);S.foto=null;syncJuri();const perlu=API.on()&&!(S.prof.lomba||[]).length;alert(perlu?'Profil juri tersimpan. Sekarang pilih lomba yang akan Anda nilai.':'Profil juri tersimpan.');S.tab=perlu?'profil':'nilai';render()}}
 async function send(){const c=calc(),p=S.prof;
   if(!p.name||!p.foto||!p.ttd){alert('Lengkapi Profil Juri (nama, foto kamera, tanda tangan) dulu.');S.tab='profil';return render()}
   if(!p.role){alert('Pilih jenis juri (K3 atau Teknis) di Profil Juri dulu.');S.tab='profil';return render()}
@@ -574,6 +620,7 @@ document.addEventListener('click',e=>{const rk=e.target.closest('[data-m]');if(r
   if(b.dataset.tab){S.tab=b.dataset.tab;S.detail=null;return render()}
   if(b.dataset.lomba){S.lomba=b.dataset.lomba;return render()}
   if(b.dataset.sw)return swDo(b.dataset.sw);
+  if(b.dataset.gl){S.gl=b.dataset.gl;const g=$('#guide');if(g)g.innerHTML=guideInner();return}
   if(b.dataset.role){if(b.dataset.lock)return alert('Jenis juri terkunci karena Anda sudah mengirim nilai. Minta admin menghapus nilai Anda bila perlu mengubahnya.');S.roleSel=b.dataset.role;$$('.rolebtn').forEach(x=>x.classList.toggle('on',x===b));return}
   if(b.dataset.lv){S.lv=b.dataset.lv;return renderLive()}
   if(b.dataset.act==='fs'){return document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen()}
