@@ -322,7 +322,7 @@ function beep(n=1){try{AC=AC||new (window.AudioContext||window.webkitAudioContex
 const fmt=ms=>{const s=Math.floor(Math.abs(ms)/1000);return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')};
 const fmtSw=ms=>{const t=Math.floor(Math.max(0,ms)/100),d=t%10,s=Math.floor(t/10)%60,m=Math.floor(t/600);return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0')+'.'+d};
 const SWK='sw',swGet=()=>{const a=ld(SWK,null);return a&&a.key?a:null},swMs=a=>a?a.acc+(a.run?Date.now()-a.start:0):0,swKey=()=>S.lomba+'__'+S.mitra;
-function swCard(role){if(role==='k3')return '';const a=swGet(),mine=a&&a.key===swKey(),w=S.d&&S.d.waktu!==''&&S.d.waktu!=null;let txt,btn='';
+function swCard(role){const a=swGet(),mine=a&&a.key===swKey(),w=S.d&&S.d.waktu!==''&&S.d.waktu!=null;let txt,btn='';
   if(a&&!mine)txt=`Stopwatch sedang berjalan untuk <b>${esc(a.name)}</b> (${esc(LB[a.lomba].short)}). Selesaikan dulu lewat pop-up.`;
   else if(mine)txt=`Stopwatch ${a.run?'berjalan':'dijeda'}. Kontrolnya ada di pop-up melayang; tekan <b>Selesai</b> di sana saat pekerjaan tuntas.`;
   else if(w){txt=`Waktu tercatat: <b>${esc(S.d.waktu)} menit</b>.`;btn='<button class="sec fix" data-sw="start">\u21ba Ulangi</button>'}
