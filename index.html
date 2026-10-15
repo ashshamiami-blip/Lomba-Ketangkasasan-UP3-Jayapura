@@ -273,12 +273,12 @@ const COL=['var(--c1)','var(--c2)','var(--c3)'];
 let S={tab:'nilai',lomba:CONFIG.lombas[0].id,mitra:0,d:null,prof:ld('profil',{}),scores:{},col:null,dcol:null,drafts:{},timers:{},off:0,mode:'lokal'};
 const docId=()=>`${S.lomba}__${S.mitra}__${slug(S.prof.name)||'anon'}`;
 const blank=()=>({waktu:'',fatal:'Tidak',khusus:0,ded:{},miss:{},notes:{},unit:'',urut:S.mitra+1});
-function openDraft(){const id=docId(),ex=S.scores[id],L=ld('dr:'+id,null),R=S.drafts[id];
+function openDraft(){if(S.pv){S.pvd=S.pvd||{};const k=docId()+'|'+S.pv;S.d=S.pvd[k]=S.pvd[k]||blank();return}const id=docId(),ex=S.scores[id],L=ld('dr:'+id,null),R=S.drafts[id];
   const dr=L&&R?((R._t||0)>(L._t||0)?R:L):(L||R);
   S.d=dr?JSON.parse(JSON.stringify(dr)):(ex?JSON.parse(JSON.stringify(ex)):blank());
   if(Array.isArray(S.d.miss))S.d.miss=Object.fromEntries(S.d.miss.map(k=>[k,1]));delete S.d.foto;delete S.d.ttd;
   for(const k of ['ded','miss','notes'])S.d[k]=S.d[k]||{}}
-let dt;function saveDraft(){const id=docId();S.d._t=Date.now();sv('dr:'+id,S.d);
+let dt;function saveDraft(){if(S.pv)return;const id=docId();S.d._t=Date.now();sv('dr:'+id,S.d);
   if(S.col&&S.dcol&&S.prof.name){clearTimeout(dt);const ex=S.scores[id],snap={...S.d,judge:slug(S.prof.name),judgeName:S.prof.name,role:S.prof.role,lomba:S.lomba,mitra:S.mitra,same:!!(ex&&norm(ex)===norm(S.d))};dt=setTimeout(()=>API.set('drafts',id,snap).catch(()=>{}),350)}}
 /* nilai sementara: draf juri yang belum dikirim ikut tampil di papan skor live */
 const norm=d=>JSON.stringify([d.waktu===''||d.waktu==null?'':+d.waktu,Object.keys(d.ded||{}).filter(k=>d.ded[k]!==''&&d.ded[k]!=null).sort().map(k=>[k,+d.ded[k]]),(Array.isArray(d.miss)?d.miss:Object.keys(d.miss||{}).filter(k=>d.miss[k])).sort(),d.fatal||'Tidak',+d.khusus||0]);
@@ -296,7 +296,7 @@ const isK3r=r=>CONFIG.k3.aspek.includes(nA(r.a))||CONFIG.k3.kategori.includes(CO
 const ownR=(r,role)=>!role||role==='penuh'||(role==='k3')===isK3r(r);
 const ownC=(k,role)=>!role||role==='penuh'||(role==='k3')===CONFIG.k3.kategori.includes(k);
 const wRole=role=>RUBRIK[CONFIG.lombas[0].id].filter(r=>ownR(r,role)).reduce((s,r)=>s+r.b,0);
-function calc(lb=S.lomba,d=S.d,role=S.prof.role){
+function calc(lb=S.lomba,d=S.d,role=curRole()){
   const rub=RUBRIK[lb],cat={},pts={};
   items(lb).forEach(c=>{if(ownC(c.k,role)&&d.miss[c.n]){cat[c.k]=(cat[c.k]||0)+1;pts[c.k]=(pts[c.k]||0)+(c.pt??CONFIG.penaltyPerItem)}});
   let total=0,need=0,opt=0,rows=[],asp={};
@@ -360,7 +360,7 @@ function swDrag(e){const h=e.querySelector('.swh');let dr=null;
   h.onpointerdown=ev=>{const r=e.getBoundingClientRect();dr={dx:ev.clientX-r.left,dy:ev.clientY-r.top};h.setPointerCapture(ev.pointerId);e.className=e.className.replace(/ ?swc-\w+/,'')+' drag';e.style.left=r.left+'px';e.style.top=r.top+'px'};
   h.onpointermove=ev=>{if(!dr)return;e.style.left=Math.max(0,Math.min(innerWidth-e.offsetWidth,ev.clientX-dr.dx))+'px';e.style.top=Math.max(0,Math.min(innerHeight-e.offsetHeight,ev.clientY-dr.dy))+'px'};
   h.onpointerup=h.onpointercancel=()=>{if(!dr)return;dr=null;const r=e.getBoundingClientRect(),c=(r.left+r.width/2<innerWidth/2?'l':'r'),v=(r.top+r.height/2<innerHeight/2?'t':'b');sv('swc',v+c);e.style.left=e.style.top='';e.className=e.className.replace(' drag','')+' swc-'+v+c}}
-function swPop(){let e=$('#swpop');const k=tmKey(),t=(S.tab==='nilai'&&authOk()&&S.prof.role)?tmGet(k):null;
+function swPop(){let e=$('#swpop');const k=tmKey(),t=(S.tab==='nilai'&&authOk()&&!S.pv&&S.prof.role)?tmGet(k):null;
   if(!t){if(e)e.remove();return}
   const mine=isMine(t),sig=t.status+'|'+mine;
   if(!e){e=document.createElement('div');e.id='swpop';e.className='swpop swc-'+ld('swc','bl');
@@ -374,9 +374,9 @@ function swPop(){let e=$('#swpop');const k=tmKey(),t=(S.tab==='nilai'&&authOk()&
   if(t.status==='run'){const kk=k+'|'+t.start;if(rem<=300000&&rem>0&&!warned[kk+'w']){warned[kk+'w']=1;beep(1)}if(rem<=0&&!warned[kk+'o']){warned[kk+'o']=1;beep(3)}}}
 setInterval(swPop,200);
 /* waktu resmi dari stopwatch bersama otomatis masuk ke lembar juri teknis */
-function syncWaktu(){if(S.tab!=='nilai'||!S.d||S.prof.role!=='teknis')return;const t=S.timers[tmKey()],i=$('[data-f=waktu]');if(!i)return;
+function syncWaktu(){if(S.tab!=='nilai'||!S.d||S.pv||S.prof.role!=='teknis')return;const t=S.timers[tmKey()],i=$('[data-f=waktu]');if(!i)return;
   if(t&&t.status==='done'&&t.min!=null){i.readOnly=true;if(S.d.waktu===''||+S.d.waktu!==t.min){S.d.waktu=t.min;i.value=t.min;upd()}}else i.readOnly=false}
-function onTimers(force){if(S.tab!=='nilai'||!authOk())return;const k=tmKey(),t=S.timers[k]||{},sig=[t.status,t.v,t.by,t.min].join(),c=$('#swc');
+function onTimers(force){if(S.tab!=='nilai'||S.pv||!authOk())return;const k=tmKey(),t=S.timers[k]||{},sig=[t.status,t.v,t.by,t.min].join(),c=$('#swc');
   if(force||S.tsig!==sig){S.tsig=sig;if(c)c.innerHTML=swCardInner();syncWaktu()}
   const ms=Object.entries(S.timers).filter(([_,x])=>x.status==='run'||x.status==='pause').map(([q,x])=>q+x.v).join();if(ms!==S.msig){S.msig=ms;if(!S.busy)fillMitra()}}
 function mergeT(n){n=n||{};const o=S.timers,out={};Object.keys(n).forEach(k=>{const l=o[k];out[k]=(l&&(l.v||0)>(n[k].v||0)&&Date.now()-(l._lt||0)<8000)?l:n[k]});Object.keys(o).forEach(k=>{if(!(k in n)&&Date.now()-(o[k]._lt||0)<8000)out[k]=o[k]});S.timers=out}
@@ -389,7 +389,8 @@ const API={on:()=>!!CONFIG.apiUrl,
   set(col,id,data){return this.post({op:'set',col,id,data})},del(col,ids,adm){return this.post({op:'del',col,ids},adm)}};
 /* ---------- akun juri: login & pembatasan lomba ---------- */
 const authOk=()=>!API.on()||!!(S.prof.token&&S.prof.exp>Date.now());
-const allowL=()=>{if(!API.on()||!authOk())return CONFIG.lombas;const a=S.prof.lomba||[];return CONFIG.lombas.filter(l=>a.includes(l.id))};
+const curRole=()=>S.pv||S.prof.role;
+const allowL=()=>{if(S.pv||!API.on()||!authOk())return CONFIG.lombas;const a=S.prof.lomba||[];return CONFIG.lombas.filter(l=>a.includes(l.id))};
 function ensureL(){const a=allowL();if(a.length&&!a.some(l=>l.id===S.lomba))S.lomba=a[0].id}
 async function pull(){try{const t0=Date.now(),j=await API.get(),t1=Date.now();if(j.now)S.off=j.now-(t0+t1)/2;S.scores=j.scores||{};const first=!S.dloaded;S.dloaded=1;S.drafts=j.drafts||{};mergeT(j.timers);S.mode='terhubung server';onScores();onDrafts(first);onTimers()}catch(e){S.mode='server gagal';const m=$('#mode');if(m)m.textContent=S.mode}}
 async function initDb(){if(!API.on()){S.mode='lokal';S.scores=ld('scores',{});S.timers=ld('tmrs',{});onScores();return}
@@ -405,14 +406,15 @@ function picker(){return `<div class="chips">${allowL().map(l=>`<button class="c
 <div class="card"><b>${esc(LB[S.lomba].nama)}</b><div class="mut">Batas waktu ${LB[S.lomba].batas} menit</div><label>Mitra yang dinilai</label><select id="mitra"></select><div class="mut" style="margin-top:4px">✓ sudah dikirim · ✎ draf belum dikirim (bisa dilanjutkan)</div></div>`}
 function fillMitra(){const s=$('#mitra');if(!s)return;s.innerHTML=CONFIG.mitra.map((m,i)=>`<option value="${i}" ${i===S.mitra?'selected':''}>${i+1}. ${esc(m)}${mark(i)}</option>`).join('')}
 function render(){document.body.dataset.v=S.tab;if(S.tab!=='live')S.liveSeen=false;nav();({nilai:renderNilai,live:renderLive,profil:renderProfil})[S.tab]()}
+function pvBanner(){const r=S.pv;return `<div class="warnbox"><b>MODE PRATINJAU ADMIN</b> – ini tampilan halaman penilaian yang dilihat juri. Silakan coba isi untuk memperlihatkan cara kerjanya; isian hanya contoh dan tidak disimpan atau dikirim.<div class="row" style="margin-top:8px"><button class="${r==='k3'?'ok':'sec'}" data-pv="k3">🦺 Juri K3</button><button class="${r==='teknis'?'ok':'sec'}" data-pv="teknis">🔧 Juri Teknis</button><button class="sec" data-act="pvexit">← Kembali ke Admin</button></div></div>`}
 function renderNilai(){
-  stopCam();ensureL();const role=S.prof.role;
-  if(!authOk()){$('#app').innerHTML=head()+`<div class="card"><h2>Masuk dulu</h2><p class="mut">Penilaian hanya untuk juri yang punya akun (dibuat oleh admin/pengawas). Live Score tetap bisa dilihat siapa saja. Masuk lewat menu Profil Juri.</p><button data-tab="profil" style="width:100%">Buka Profil Juri</button></div>`;return}
+  stopCam();ensureL();const role=curRole();
+  if(!S.pv&&!authOk()){$('#app').innerHTML=head()+`<div class="card"><h2>Masuk dulu</h2><p class="mut">Penilaian hanya untuk juri yang punya akun (dibuat oleh admin/pengawas). Live Score tetap bisa dilihat siapa saja. Masuk lewat menu Profil Juri.</p><button data-tab="profil" style="width:100%">Buka Profil Juri</button></div>`;return}
   if(API.on()&&!allowL().length){$('#app').innerHTML=head()+`<div class="card"><h2>Pilih lomba dulu</h2><p class="mut">Anda belum memilih lomba. Simpan Profil Juri (foto dan tanda tangan), lalu pilih lomba yang akan Anda nilai. Hanya lomba yang Anda pilih yang muncul di sini.</p><button data-tab="profil" style="width:100%">Buka Profil Juri</button></div>`;return}
   if(!role){$('#app').innerHTML=head()+`<div class="card"><h2>Pilih jenis juri dulu</h2><p class="mut">Sebelum menilai, tentukan apakah Anda <b>Juri K3</b> atau <b>Juri Teknis</b> di menu Profil Juri. Juri K3 hanya menilai K3, keselamatan, dan APD; Juri Teknis hanya menilai sisi teknis.</p><button data-tab="profil" style="width:100%">Buka Profil Juri</button></div>`;return}
-  openDraft();S.tsig=null;const T0=S.timers[tmKey()],tdn=!!(T0&&T0.status==='done'&&T0.min!=null);if(tdn&&role==='teknis')S.d.waktu=T0.min;const rub=RUBRIK[S.lomba],d=S.d,own=r=>ownR(r,role),asps=[...new Set(rub.filter(own).map(r=>r.a))],R=ROLES[role];
+  openDraft();S.tsig=null;const T0=S.timers[tmKey()],tdn=!!(!S.pv&&T0&&T0.status==='done'&&T0.min!=null);if(tdn&&role==='teknis')S.d.waktu=T0.min;const rub=RUBRIK[S.lomba],d=S.d,own=r=>ownR(r,role),asps=[...new Set(rub.filter(own).map(r=>r.a))],R=ROLES[role];
   const sent=S.scores[docId()];
-  let h=head()+swCard()+(S.prof.name&&S.prof.foto&&S.prof.ttd?'':`<div class="warnbox">Lengkapi <b>Profil Juri</b> (nama, foto kamera, tanda tangan) sebelum mengirim nilai.</div>`);
+  let h=head()+(S.pv?pvBanner():swCard())+(S.pv||S.prof.name&&S.prof.foto&&S.prof.ttd?'':`<div class="warnbox">Lengkapi <b>Profil Juri</b> (nama, foto kamera, tanda tangan) sebelum mengirim nilai.</div>`);
   h+=`<div class="nl-top"><div>${picker()}</div><div><div class="card rolecard"><div class="row"><b style="font-size:17px">${R.i} ${R.n}</b><span class="fix mut">bobot ${f2(wRole(role))} dari 100</span></div><div class="mut">${R.d}. ${role==='k3'?'Nilai K3 Anda otomatis ditambahkan ke nilai setiap juri teknis. Waktu dan aspek teknis tidak perlu diisi.':'Nilai K3 diambil otomatis dari Juri K3 dan digabung ke nilai Anda, sehingga total tetap 100. Aspek K3 tidak perlu diisi.'}</div></div>`
    +(role==='teknis'?`<div class="card"><label style="margin-top:0">Waktu penyelesaian aktual (menit)</label><input data-f="waktu" type="number" inputmode="decimal" step="0.01" value="${esc(d.waktu)}" ${tdn?'readonly':''}><div class="mut">Terisi otomatis dari stopwatch bersama saat dihentikan (terkunci, sama untuk semua juri). Bila tidak ada stopwatch, isi manual.</div></div>`:'')+`</div></div>`;
   const bl=[],cks=[...new Set(items(S.lomba).filter(c=>ownC(c.k,role)).map(c=>c.k))];
@@ -431,10 +433,10 @@ function renderNilai(){
   h+=`<div class="card"><label>Pelanggaran fatal / diskualifikasi?</label><div class="seg" id="fatal"><button class="y ${d.fatal==='Tidak'?'on':''}" data-v="Tidak">Tidak</button><button class="n ${d.fatal==='Ya'?'on':''}" data-v="Ya">Ya</button></div>
   <label>Pengurangan khusus (angka positif, mis. teguran juri)</label><input data-f="khusus" type="number" inputmode="decimal" step="0.25" value="${esc(d.khusus)}"></div>
   <div class="sum"><div><div class="mut" style="color:inherit;opacity:.7" id="sumInfo"></div><div>Nilai bagian Anda <small style="opacity:.7">(maks ${f2(wRole(role))})</small></div></div><div class="sumr"><div class="num" id="sumFinal">0</div><div class="k3s" id="sumK3"></div></div></div>
-  <div class="row"><button class="sec" data-act="zero">Isi semua yang kosong: tanpa pengurangan</button><button class="ok kirim" data-act="send">Kirim</button></div>
-  <p class="mut" id="sentInfo">${sent?'Nilai Anda untuk mitra ini sudah terkirim. ':''}Isian tersimpan otomatis sebagai draf; boleh ditutup dan dilanjutkan nanti (juga dari HP lain dengan nama juri yang sama).</p>`;
+  <div class="row"><button class="sec" data-act="zero">Isi semua yang kosong: tanpa pengurangan</button><button class="ok kirim" data-act="send">${S.pv?'Kirim (contoh, tidak disimpan)':'Kirim'}</button></div>
+  <p class="mut" id="sentInfo">${S.pv?'Mode pratinjau: isian hanya contoh dan tidak disimpan. ':sent?'Nilai Anda untuk mitra ini sudah terkirim. ':''}${S.pv?'':'Isian tersimpan otomatis sebagai draf; boleh ditutup dan dilanjutkan nanti (juga dari HP lain dengan nama juri yang sama).'}</p>`;
   $('#app').innerHTML=h;fillMitra();upd()}
-function upd(){const c=calc(),rub=RUBRIK[S.lomba],role=S.prof.role;
+function upd(){const c=calc(),rub=RUBRIK[S.lomba],role=curRole();
   c.rows.forEach((r,i)=>{const e=$('#sk'+i);if(e)e.textContent=r.sc===null?'–':f2(r.sc);const k=$('#ck'+i);if(k)k.textContent=f2(r.ck)});
   [...new Set(rub.filter(r=>ownR(r,role)).map(r=>r.a))].forEach((a,i)=>{const e=$('#as'+i);if(e)e.textContent=f2(c.asp[a])+' / '+f2(rub.filter(r=>r.a===a&&ownR(r,role)).reduce((s,r)=>s+r.b,0))});
   const ck=$('#ckSum');if(ck)ck.textContent=c.nmiss?`−${f2(c.ptsAll)} (${c.nmiss} item)`:'Lengkap';
@@ -497,19 +499,51 @@ function guideInner(){const lb=S.gl||CONFIG.lombas[0].id,L=LB[lb],rub=RUBRIK[lb]
     h+=`<details class="as"><summary><span>${role==='k3'?'Checklist APD & alat pengaman':'Checklist alat kerja & material'}</span><span class="mut">otomatis</span></summary>`+cks.map(k=>{const sub=Object.entries(CONFIG.mapKategori).find(([,v])=>v===k);return `<div class="sub"><h3>${esc(k)}</h3><p class="mut">Tiap item “Tidak ada” mengurangi ${f2(CONFIG.penaltyPerItem)} poin${sub?' pada sub aspek “'+esc(sub[0])+'”':''}.</p>`+items(lb).filter(c=>c.k===k).map(c=>`<div class="ci"><div>${esc(c.n)}${c.q>1?' ×'+c.q:''}<br><small>${esc(c.s)}</small></div></div>`).join('')+'</div>'}).join('')+'</details></div>';
     return h};
   return `<h3>Panduan penilaian: Juri K3 &amp; Juri Teknis</h3><p class="mut">Halaman baca-saja untuk memberi pemahaman kepada juri. Nilai satu lomba = nilai Juri K3 + nilai Juri Teknis (total 100). Pelanggaran fatal = nilai 0; pengurangan khusus dipotong dari nilai bagian juri.</p><div class="chips">${CONFIG.lombas.map(l=>`<button class="chip ${l.id===lb?'on':''}" data-gl="${l.id}">${esc(l.short)}</button>`).join('')}</div><div class="mut" style="margin:6px 0">${esc(L.nama)}</div><div class="gcols">${sec('k3')}${sec('teknis')}</div>`}
+function verifHtml(users,jp){
+  const J=new Map(),RN={k3:'Juri K3',teknis:'Juri Teknis'},LI=id=>CONFIG.lombas.findIndex(l=>l.id===id),fd=t=>t?new Date(t).toLocaleString('id-ID'):'-';
+  (users||[]).forEach(u=>J.set(u.id,{id:u.id,name:u.name,role:u.role,lomba:u.lomba||[],acct:true}));
+  const add=(id,name,role)=>{if(id&&!J.has(id))J.set(id,{id,name:name||id,role,lomba:[],acct:false})};
+  Object.values(S.scores).forEach(x=>add(x.judge,x.judgeName,x.role));
+  Object.entries(S.drafts).forEach(([k,d])=>add(k.split('__')[2],d.judgeName,d.role));
+  let nOk=0,nSheet=0,nWarn=0;
+  const cards=[...J.values()].sort((a,b)=>(b.acct-a.acct)||a.name.localeCompare(b.name)).map(j=>{
+    const sc=Object.values(S.scores).filter(x=>x.judge===j.id).sort((a,b)=>LI(a.lomba)-LI(b.lomba)||a.mitra-b.mitra),
+      dr=Object.entries(S.drafts).filter(([k,d])=>k.split('__')[2]===j.id&&!S.scores[k]&&norm(d)!==BLANKN).map(([k,d])=>({k,lomba:k.split('__')[0],mitra:+k.split('__')[1]})).sort((a,b)=>LI(a.lomba)-LI(b.lomba)||a.mitra-b.mitra),
+      p=jp&&jp[j.id],prof=!!(p&&p.foto&&p.ttd),W=new Set();
+    if(!j.acct)W.add('Tidak ada akun terdaftar untuk juri ini. Nilai ini patut dicurigai.');
+    if(jp&&j.acct&&!prof)W.add('Profil belum lengkap: foto atau tanda tangan belum tersimpan.');
+    sc.forEach(x=>{if(j.acct&&x.role&&x.role!==j.role)W.add(`Jenis juri pada nilai (${RN[x.role]||x.role}) berbeda dengan akun (${RN[j.role]||j.role}).`);
+      if(j.acct&&!j.lomba.includes(x.lomba))W.add(`Menilai ${LB[x.lomba]?LB[x.lomba].short:x.lomba} yang tidak ada di pilihan lomba akun ini.`)});
+    const ok=!W.size;if(ok)nOk++;nWarn+=W.size;nSheet+=sc.length;
+    const byL=CONFIG.lombas.map(l=>{const a=sc.filter(x=>x.lomba===l.id),b=dr.filter(x=>x.lomba===l.id);if(!a.length&&!b.length)return '';
+      return `<h3 style="margin-top:8px">${esc(l.short)}</h3>`+a.map(x=>`<div class="ci"><div>${esc(x.mitraNama||CONFIG.mitra[x.mitra]||'Mitra '+(x.mitra+1))}<br><small>✓ terkirim ${fd(x.srv||x.ts)}${x.rev?' · revisi '+x.rev:''}${x.role!=='k3'&&x.waktu!=null&&x.waktu!==''?' · waktu '+x.waktu+' menit':''}${x.fatal==='Ya'?' · DISKUALIFIKASI':''}</small></div><b>${f2(x.final)}</b></div>`).join('')+b.map(x=>`<div class="ci"><div>${esc(CONFIG.mitra[x.mitra]||'Mitra '+(x.mitra+1))}<br><small>✎ draf, belum dikirim</small></div><span class="mut">–</span></div>`).join('')}).join('');
+    return `<details class="as"><summary><span>${esc(j.name)} <small class="mut">· ${RN[j.role]||'jenis ?'} · ${sc.length} nilai</small></span><span class="${ok?'ok':'bad'}">${ok?'✔ valid':'⚠ '+W.size+' peringatan'}</span></summary><div class="sub">`
+      +`<p>Akun: <b class="${j.acct?'ok':'bad'}">${j.acct?'✔ terdaftar':'✖ tidak terdaftar'}</b> · Profil: ${!jp?'<span class="mut">tidak dapat diperiksa</span>':prof?`<b class="ok">✔ lengkap</b> (disimpan ${fd(p.ts)})`:'<b class="bad">⚠ belum lengkap</b>'}</p>`
+      +`<p>Lomba pilihan juri: ${j.lomba.length?j.lomba.map(id=>esc(LB[id]?LB[id].short:id)).join(', '):'<span class="mut">belum memilih</span>'}</p>`
+      +(W.size?`<div class="warnbox">${[...W].map(esc).join('<br>')}</div>`:'')
+      +(j.acct&&jp&&prof?`<button class="sec" data-adm="jmedia" data-v="${esc(j.id)}" style="margin:4px 0">🪪 Lihat foto &amp; tanda tangan</button><div id="jm-${esc(j.id)}"></div>`:'')
+      +`<h3 style="margin-top:8px">Mitra yang dinilai</h3>`+(byL||'<p class="mut">Belum menilai mitra mana pun.</p>')+`</div></details>`}).join('');
+  return `<h3>Verifikasi juri</h3><p class="mut">Periksa siapa saja yang menilai, mitra apa saja yang dinilai, dan apakah identitasnya valid (akun terdaftar, foto dan tanda tangan tersimpan).</p><div class="mut" style="margin-bottom:8px">${J.size} juri · ${nOk} valid · ${nSheet} lembar nilai terkirim · ${nWarn} peringatan</div>`+(cards||'<p class="mut">Belum ada juri.</p>')}
 async function renderAdmin(){stopCam();document.body.dataset.v='admin';
   const sc=Object.values(S.scores),js=[...new Map(sc.map(s=>[s.judge,s.judgeName]))],AU=API.on();
   const B=(k,v,t,c='warn')=>`<button class="${c}" style="width:100%;margin:4px 0" data-adm="${k}" data-v="${esc(v||'')}">${t}</button>`;
   let users=null,uerr='';if(AU){try{users=(await API.post({op:'user.list'},true)).users}catch(e){uerr=e.message||'gagal'}}
+  let jp=null;if(AU&&users){try{jp=(await API.post({op:'juri.list'},true)).juri}catch(e){}}
   const RN={k3:'Juri K3',teknis:'Juri Teknis'};
   const ulist=!AU?'<p class="mut">Akun juri hanya tersedia saat website terhubung ke server (apiUrl terisi).</p>':users?(users.length?users.map(u=>`<div class="ci"><div><b>${esc(u.name)}</b><br><small>${RN[u.role]||u.role} · ${(u.lomba&&u.lomba.length)?'lomba pilihan juri: '+u.lomba.map(id=>esc(LB[id]?LB[id].short:id)).join(', '):'belum memilih lomba'}</small></div><div style="display:flex;gap:6px"><button class="sec" data-adm="upin" data-v="${esc(u.id)}">Reset PIN</button><button class="warn" data-adm="udel" data-v="${esc(u.id)}">Hapus</button></div></div>`).join(''):'<p class="mut">Belum ada akun juri.</p>'):`<p class="bad">${esc(uerr)} Kembali lalu masuk admin lagi.</p>`;
   const form=AU&&users?`<h3 style="margin-top:14px">Buat akun juri baru</h3><label>Nama juri (dipakai untuk masuk)</label><input id="un" autocomplete="off"><label>Jenis juri</label><select id="ur"><option value="k3">Juri K3</option><option value="teknis">Juri Teknis</option></select><p class="mut">Lomba tidak ditentukan di sini: juri memilih sendiri lomba yang dinilai di menu Profil Juri setelah menyimpan profilnya.</p><label>PIN 4–8 angka (kosongkan = dibuat acak)</label><input id="up" inputmode="numeric" autocomplete="off"><button class="ok" data-adm="uadd" style="width:100%;margin-top:8px">Buat akun</button>`:'';
   $('#app').innerHTML=head()+`<div class="row" style="margin-bottom:10px"><button class="sec" data-act="admback">← Kembali</button>${AU?'<button class="sec" data-adm="alogout">Keluar admin</button>':''}</div><div class="card"><h2>Admin / Pengawas</h2><div class="mut">${sc.length} lembar nilai terkirim · ${Object.keys(S.drafts).length} draf di server · ${js.length} juri sudah mengirim · mode ${S.mode}</div></div>
+  <div class="card"><h3>Pratinjau halaman penilaian</h3><p class="mut">Buka halaman penilaian persis seperti yang dilihat juri, untuk dipertunjukkan. Anda bisa mencoba mengisi nilai; semuanya hanya contoh dan tidak disimpan.</p>${B('pv','k3','🦺 Lihat sebagai Juri K3','ok')}${B('pv','teknis','🔧 Lihat sebagai Juri Teknis','ok')}</div>
   <div class="card"><h3>Akun juri</h3>${ulist}${form}</div>
+  <div class="card" id="verif">${verifHtml(users,jp)}</div>
   <div class="card" id="guide">${guideInner()}</div>
   <div class="card"><h3>Hapus nilai terkirim</h3>${CONFIG.lombas.map(l=>B('lomba',l.id,'Hapus semua nilai '+esc(l.short))).join('')}${js.map(([k,n])=>B('judge',k,'Hapus nilai juri: '+esc(n))).join('')}${B('all','','HAPUS SEMUA NILAI')}</div>
   <div class="card"><h3>Draf &amp; data HP ini</h3>${B('drafts','','Hapus semua draf di server','sec')}${B('timers','','Reset semua stopwatch bersama','sec')}${B('local','','Reset data di HP ini (draf, timer, profil)','sec')}</div>`}
 async function admAct(k,v){
+  if(k==='jmedia'){const box=$('#jm-'+v);if(!box)return;box.innerHTML='<p class="mut">Memuat foto dan tanda tangan…</p>';
+    try{const j=await API.post({op:'juri.get',id:v},true);box.innerHTML=(j.foto?`<img class="foto" src="${j.foto}" alt="Foto juri">`:'<p class="mut">Foto belum ada.</p>')+(j.ttd?`<img src="${j.ttd}" alt="Tanda tangan" style="max-width:260px;width:100%;background:#fff;border:1px solid var(--line);border-radius:8px;display:block;margin-top:6px">`:'<p class="mut">Tanda tangan belum ada.</p>')}
+    catch(e){box.innerHTML='<p class="bad">'+esc(e.message||'Gagal memuat')+'</p>'}return}
+  if(k==='pv'){S.pv=v;S.tab='nilai';S.detail=null;S.lomba=CONFIG.lombas[0].id;S.mitra=0;return render()}
   if(k==='alogout'){S.atok='';S.tab='profil';return render()}
   if(k==='uadd'){const name=$('#un').value.trim(),role=$('#ur').value,pin=$('#up').value.trim();
     if(!name)return alert('Isi nama juri.');
@@ -601,7 +635,7 @@ async function pact(a){
   if(a==='clr'){const cv=$('#pad');cv.getContext('2d').clearRect(0,0,600,300);S.sig=false}
   if(a==='save'){const AU=API.on(),n=AU?S.prof.name:$('#jn').value.trim();if(!n)return alert('Isi nama juri.');const foto=S.foto||S.prof.foto;if(!foto)return alert('Ambil foto wajah dengan kamera.');if(!S.sig)return alert('Tanda tangan dulu.');const role=AU?S.prof.role:(S.prof.role&&Object.values(S.scores).some(s=>s.judge===slug(S.prof.name))?S.prof.role:S.roleSel);if(!role)return alert('Pilih jenis juri: Juri K3 atau Juri Teknis.');
     S.prof={...S.prof,name:n,role,foto,ttd:$('#pad').toDataURL('image/png'),ts:Date.now(),synced:0};sv('profil',S.prof);S.foto=null;syncJuri();const perlu=API.on()&&!(S.prof.lomba||[]).length;alert(perlu?'Profil juri tersimpan. Sekarang pilih lomba yang akan Anda nilai.':'Profil juri tersimpan.');S.tab=perlu?'profil':'nilai';render()}}
-async function send(){const c=calc(),p=S.prof;
+async function send(){if(S.pv)return alert('Mode pratinjau admin: nilai contoh tidak dikirim atau disimpan.');const c=calc(),p=S.prof;
   if(!p.name||!p.foto||!p.ttd){alert('Lengkapi Profil Juri (nama, foto kamera, tanda tangan) dulu.');S.tab='profil';return render()}
   if(!p.role){alert('Pilih jenis juri (K3 atau Teknis) di Profil Juri dulu.');S.tab='profil';return render()}
   if(!c.complete)return alert(`Masih ${c.need} sub aspek belum terisi (isi 0 jika tidak ada pengurangan, dan isi waktu aktual).`);
@@ -617,9 +651,11 @@ document.addEventListener('click',e=>{const rk=e.target.closest('[data-m]');if(r
   if(b.dataset.act==='admin')return adminOpen();
   if(b.dataset.act==='admback'){S.tab='profil';return render()}
   if(b.dataset.adm)return admAct(b.dataset.adm,b.dataset.v);
-  if(b.dataset.tab){S.tab=b.dataset.tab;S.detail=null;return render()}
+  if(b.dataset.tab){if(b.dataset.tab!=='nilai')S.pv=null;S.tab=b.dataset.tab;S.detail=null;return render()}
   if(b.dataset.lomba){S.lomba=b.dataset.lomba;return render()}
   if(b.dataset.sw)return swDo(b.dataset.sw);
+  if(b.dataset.pv){S.pv=b.dataset.pv;return render()}
+  if(b.dataset.act==='pvexit'){S.pv=null;return renderAdmin()}
   if(b.dataset.gl){S.gl=b.dataset.gl;const g=$('#guide');if(g)g.innerHTML=guideInner();return}
   if(b.dataset.role){if(b.dataset.lock)return alert('Jenis juri terkunci karena Anda sudah mengirim nilai. Minta admin menghapus nilai Anda bila perlu mengubahnya.');S.roleSel=b.dataset.role;$$('.rolebtn').forEach(x=>x.classList.toggle('on',x===b));return}
   if(b.dataset.lv){S.lv=b.dataset.lv;return renderLive()}
@@ -629,7 +665,7 @@ document.addEventListener('click',e=>{const rk=e.target.closest('[data-m]');if(r
   if(b.dataset.st){const i=b.dataset.st,inp=$(`[data-ded="${i}"]`);inp.value=Math.max(0,(+inp.value||0)+ +b.dataset.n);S.d.ded[i]=inp.value;return upd()}
   const seg=b.closest('[data-chk]');if(seg){S.d.miss[seg.dataset.chk]=b.dataset.v==='1';$$('button',seg).forEach(x=>x.classList.toggle('on',x===b));return upd()}
   if(b.closest('#fatal')){S.d.fatal=b.dataset.v;$$('#fatal button').forEach(x=>x.classList.toggle('on',x===b));return upd()}
-  if(b.dataset.act==='zero'){RUBRIK[S.lomba].forEach((r,i)=>{if(ownR(r,S.prof.role)&&!r.auto&&(S.d.ded[i]===''||S.d.ded[i]==null))S.d.ded[i]=0;});$$('[data-ded]').forEach(x=>{if(x.value==='')x.value=0});return upd()}
+  if(b.dataset.act==='zero'){RUBRIK[S.lomba].forEach((r,i)=>{if(ownR(r,curRole())&&!r.auto&&(S.d.ded[i]===''||S.d.ded[i]==null))S.d.ded[i]=0;});$$('[data-ded]').forEach(x=>{if(x.value==='')x.value=0});return upd()}
   if(b.dataset.act==='send')return send()});
 document.addEventListener('input',e=>{const t=e.target;if(!S.d)return;
   if(t.dataset.f){S.d[t.dataset.f]=t.value;return upd()}
