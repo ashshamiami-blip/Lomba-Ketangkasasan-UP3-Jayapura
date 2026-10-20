@@ -565,14 +565,15 @@ function verifHtml(users,jp){
       if(j.acct&&!j.lomba.includes(x.lomba))W.add(`Menilai ${LB[x.lomba]?LB[x.lomba].short:x.lomba} yang tidak ada di pilihan lomba akun ini.`)});
     const ok=!W.size;if(ok)nOk++;nWarn+=W.size;nSheet+=sc.length;
     const byL=CONFIG.lombas.map(l=>{const a=sc.filter(x=>x.lomba===l.id),b=dr.filter(x=>x.lomba===l.id);if(!a.length&&!b.length)return '';
-      return `<h3 style="margin-top:8px">${esc(l.short)}</h3>`+a.map(x=>`<div class="ci"><div>${esc(x.mitraNama||CONFIG.mitra[x.mitra]||'Mitra '+(x.mitra+1))}<br><small>✓ terkirim ${fd(x.srv||x.ts)}${x.rev?' · revisi '+x.rev:''}${x.role!=='k3'&&x.waktu!=null&&x.waktu!==''?' · waktu '+x.waktu+' menit':''}${x.fatal==='Ya'?' · DISKUALIFIKASI':''}</small></div><b>${f2(x.final)}</b></div>`).join('')+b.map(x=>`<div class="ci"><div>${esc(CONFIG.mitra[x.mitra]||'Mitra '+(x.mitra+1))}<br><small>✎ draf, belum dikirim</small></div><span class="mut">–</span></div>`).join('')}).join('');
+      return `<div class="row" style="margin-top:10px;align-items:center"><div><h3 style="margin:0">${esc(l.nama)}</h3><small class="mut">${a.length} nilai terkirim · ${b.length} draf</small></div><button class="warn" data-adm="jdl" data-v="${esc(j.id)}|${esc(l.id)}" style="margin-left:auto">🗑 Hapus nilai lomba ini</button></div>`+a.map(x=>`<div class="ci"><div>${esc(x.mitraNama||CONFIG.mitra[x.mitra]||'Mitra '+(x.mitra+1))}<br><small>✓ terkirim ${fd(x.srv||x.ts)}${x.rev?' · revisi '+x.rev:''}${x.role!=='k3'&&x.waktu!=null&&x.waktu!==''?' · waktu '+x.waktu+' menit':''}${x.fatal==='Ya'?' · DISKUALIFIKASI':''}</small></div><b>${f2(x.final)}</b></div>`).join('')+b.map(x=>`<div class="ci"><div>${esc(CONFIG.mitra[x.mitra]||'Mitra '+(x.mitra+1))}<br><small>✎ draf, belum dikirim</small></div><span class="mut">–</span></div>`).join('')}).join('');
     return `<details class="as"><summary><span>${esc(j.name)} <small class="mut">· ${RN[j.role]||'jenis ?'} · ${sc.length} nilai</small></span><span class="${ok?'ok':'bad'}">${ok?'✔ valid':'⚠ '+W.size+' peringatan'}</span></summary><div class="sub">`
       +`<p>Akun: <b class="${j.acct?'ok':'bad'}">${j.acct?'✔ terdaftar':'✖ tidak terdaftar'}</b> · Profil: ${!jp?'<span class="mut">tidak dapat diperiksa</span>':prof?`<b class="ok">✔ lengkap</b> (disimpan ${fd(p.ts)})`:'<b class="bad">⚠ belum lengkap</b>'}</p>`
       +`<p>Lomba pilihan juri: ${j.lomba.length?j.lomba.map(id=>esc(LB[id]?LB[id].short:id)).join(', '):'<span class="mut">belum memilih</span>'}</p>`
       +(W.size?`<div class="warnbox">${[...W].map(esc).join('<br>')}</div>`:'')
       +(j.acct&&jp&&prof?`<button class="sec" data-adm="jmedia" data-v="${esc(j.id)}" style="margin:4px 0">🪪 Lihat foto &amp; tanda tangan</button><div id="jm-${esc(j.id)}"></div>`:'')
       +(jp&&jp[j.id]?`<button class="warn" data-adm="jclear" data-v="${esc(j.id)}" style="margin:4px 0">🗑 Hapus profil (foto &amp; tanda tangan)</button>`:'')
-      +`<h3 style="margin-top:8px">Mitra yang dinilai</h3>`+(byL||'<p class="mut">Belum menilai mitra mana pun.</p>')+`</div></details>`}).join('');
+      +`<p>Ringkasan: ${CONFIG.lombas.map(l=>{const n=sc.filter(x=>x.lomba===l.id).length;return n?esc(l.short)+' <b>'+n+'</b> mitra':''}).filter(Boolean).join(' · ')||'<span class="mut">belum ada nilai terkirim</span>'}</p>`
+      +`<h3 style="margin-top:8px">Lomba dan mitra yang dinilai</h3>`+(byL||'<p class="mut">Belum menilai mitra mana pun.</p>')+`</div></details>`}).join('');
   return `<h3>Verifikasi juri</h3><p class="mut">Periksa siapa saja yang menilai, mitra apa saja yang dinilai, dan apakah identitasnya valid (akun terdaftar, foto dan tanda tangan tersimpan).</p><div class="mut" style="margin-bottom:8px">${J.size} juri · ${nOk} valid · ${nSheet} lembar nilai terkirim · ${nWarn} peringatan</div>`+(cards||'<p class="mut">Belum ada juri.</p>')}
 async function renderAdmin(){stopCam();document.body.dataset.v='admin';
   const sc=Object.values(S.scores),js=[...new Map(sc.map(s=>[s.judge,s.judgeName]))],AU=API.on();
@@ -589,9 +590,10 @@ async function renderAdmin(){stopCam();document.body.dataset.v='admin';
   <div class="card" id="verif">${verifHtml(users,jp)}</div>
   <div class="card" id="guide">${guideInner()}</div>
   <div class="card" id="clearc"><h2>🧹 Pusat Hapus Data</h2><p class="mut">Tombol di sini menghapus langsung di server (Google Sheet dan Drive), bukan hanya di layar ini. Tidak bisa dibatalkan.</p>
-  <details class="as" open><summary><span>🎯 Hapus per lomba dan mitra</span><span class="mut">satu mitra pada satu lomba</span></summary><div class="sub"><p>Menghapus data satu mitra pada satu lomba saja. Lomba lain dan mitra lain tidak tersentuh.</p>
+  <details class="as" open><summary><span>🎯 Hapus per lomba dan mitra</span><span class="mut">satu mitra pada satu lomba</span></summary><div class="sub"><p>Menghapus data satu mitra pada satu lomba. Pilih nama juri untuk menghapus data juri itu saja, atau biarkan Semua juri. Lomba dan mitra lain tidak tersentuh.</p>
   <label>Lomba</label><select id="dlL" onchange="admCount()">${CONFIG.lombas.map(l=>`<option value="${l.id}">${esc(l.nama)}</option>`).join('')}</select>
   <label>Mitra</label><select id="dlM" onchange="admCount()">${CONFIG.mitra.map((m,i)=>`<option value="${i}">${i+1}. ${esc(m)}</option>`).join('')}</select>
+  <label>Juri</label><select id="dlJ" onchange="admCount()"><option value="">Semua juri</option></select>
   <div class="mut" id="dlC" style="margin:8px 0"></div>
   <label style="display:flex;gap:8px;align-items:center;margin:4px 0"><input type="checkbox" id="dlS" checked style="width:auto;min-height:0"> Nilai terkirim</label>
   <label style="display:flex;gap:8px;align-items:center;margin:4px 0"><input type="checkbox" id="dlD" checked style="width:auto;min-height:0"> Draf di server</label>
@@ -606,9 +608,15 @@ async function renderAdmin(){stopCam();document.body.dataset.v='admin';
   <details class="as"><summary><span>🔑 Sesi login</span></summary><div class="sub"><p>Mengeluarkan semua juri dan Anda dari sesi. Semua harus masuk lagi.</p>${B('clear','sesi','Keluarkan semua sesi','sec')}</div></details>
   <details class="as"><summary><span>📱 Data di perangkat ini</span></summary><div class="sub"><p>Draf, stopwatch, dan profil yang tersimpan di browser HP ini.</p>${B('local','','Reset data di perangkat ini','sec')}</div></details>
   <div class="danger"><b class="bad">Zona bahaya</b><p class="mut">Menghapus nilai, draf, stopwatch, profil juri, dan pilihan lomba sekaligus. Akun juri tetap ada.</p>${B('clear','all','RESET SEMUA DATA LOMBA')}</div></div>`;admCount()}
-function admCount(){const L=$('#dlL'),M=$('#dlM'),o=$('#dlC');if(!L||!M||!o)return;
-  const lb=L.value,mi=+M.value,sc=Object.values(S.scores).filter(s=>s.lomba===lb&&+s.mitra===mi),dr=Object.keys(S.drafts).filter(k=>{const p=k.split('__');return p[0]===lb&&+p[1]===mi}),tm=S.timers[lb+'__'+mi],ta=tm&&tm.status&&tm.status!=='idle'?1:0;
-  o.innerHTML=`Tersimpan saat ini: <b>${sc.length}</b> nilai terkirim${sc.length?' ('+esc(sc.map(s=>s.judgeName||s.judge).join(', '))+')':''} · <b>${dr.length}</b> draf · <b>${ta}</b> stopwatch`}
+function admCount(){const L=$('#dlL'),M=$('#dlM'),J=$('#dlJ'),o=$('#dlC');if(!L||!M||!J||!o)return;
+  const lb=L.value,mi=+M.value,key=lb+'|'+mi,scs=Object.entries(S.scores).filter(([i,s])=>s.lomba===lb&&+s.mitra===mi),drs=Object.keys(S.drafts).filter(k=>{const p=k.split('__');return p[0]===lb&&+p[1]===mi}),
+    nm=new Map();scs.forEach(([i,s])=>nm.set(s.judge,s.judgeName||s.judge));drs.forEach(k=>{const id=k.split('__')[2];if(!nm.has(id))nm.set(id,(S.drafts[k]||{}).judgeName||id)});
+  const cur=J.dataset.key===key?J.value:'';
+  J.innerHTML='<option value="">Semua juri ('+nm.size+')</option>'+[...nm].sort((x,y)=>String(x[1]).localeCompare(String(y[1]))).map(([id,n])=>`<option value="${esc(id)}">${esc(n)}</option>`).join('');
+  J.dataset.key=key;if(cur&&nm.has(cur))J.value=cur;
+  const j=J.value,sc=j?scs.filter(([i,s])=>s.judge===j):scs,dr=j?drs.filter(k=>k.split('__')[2]===j):drs,tm=S.timers[lb+'__'+mi],ta=tm&&tm.status&&tm.status!=='idle'?1:0,T=$('#dlT');
+  if(T){if(j){T.checked=false;T.disabled=true;T.dataset.off='1'}else{if(T.dataset.off){T.checked=true;delete T.dataset.off}T.disabled=false}}
+  o.innerHTML=`Tersimpan saat ini${j?' untuk <b>'+esc(nm.get(j))+'</b>':''}: <b>${sc.length}</b> nilai terkirim${!j&&sc.length?' ('+esc(sc.map(([i,s])=>s.judgeName||s.judge).join(', '))+')':''} · <b>${dr.length}</b> draf`+(j?'<br><small>Stopwatch dipakai bersama semua juri, jadi tidak ikut dihapus bila memilih satu juri.</small>':` · <b>${ta}</b> stopwatch`)}
 async function admAct(k,v){
   if(k==='jmedia'){const box=$('#jm-'+v);if(!box)return;box.innerHTML='<p class="mut">Memuat foto dan tanda tangan…</p>';
     try{const j=await API.post({op:'juri.get',id:v},true);box.innerHTML=(j.foto?`<img class="foto" src="${j.foto}" alt="Foto juri">`:'<p class="mut">Foto belum ada.</p>')+(j.ttd?`<img src="${j.ttd}" alt="Tanda tangan" style="max-width:260px;width:100%;background:#fff;border:1px solid var(--line);border-radius:8px;display:block;margin-top:6px">`:'<p class="mut">Tanda tangan belum ada.</p>')}
@@ -631,19 +639,29 @@ async function admAct(k,v){
       const tot=Object.values(n).reduce((x,y)=>x+y,0);alert(tot?'Selesai. '+tot+' data dihapus.':'Selesai. Tidak ada data yang perlu dihapus.')}
     catch(e){alert('Gagal: '+(e.message||e))}
     return setTimeout(renderAdmin,500)}
-  if(k==='mclear'){const lb=$('#dlL').value,mi=+$('#dlM').value,W=[];if($('#dlS').checked)W.push('scores');if($('#dlD').checked)W.push('drafts');if($('#dlT').checked)W.push('timers');
+  if(k==='mclear'){const lb=$('#dlL').value,mi=+$('#dlM').value,jd=$('#dlJ').value,W=[];if($('#dlS').checked)W.push('scores');if($('#dlD').checked)W.push('drafts');if($('#dlT').checked&&!jd)W.push('timers');
     if(!W.length)return alert('Pilih minimal satu jenis data yang akan dihapus.');
-    const tg={scores:'nilai terkirim',drafts:'draf',timers:'stopwatch'},nm=CONFIG.mitra[mi],ln=LB[lb].nama;
-    const sc=Object.keys(S.scores).filter(i=>{const s=S.scores[i];return s.lomba===lb&&+s.mitra===mi}),dr=Object.keys(S.drafts).filter(i=>{const p=i.split('__');return p[0]===lb&&+p[1]===mi});
-    if(!confirm('Hapus '+W.map(w=>tg[w]).join(', ')+' untuk '+nm+' pada lomba '+ln+'?\n\nTersimpan saat ini: '+sc.length+' nilai, '+dr.length+' draf.\nTidak bisa dibatalkan.'))return;
+    const tg={scores:'nilai terkirim',drafts:'draf',timers:'stopwatch'},nm=CONFIG.mitra[mi],ln=LB[lb].nama,jn=jd?$('#dlJ').selectedOptions[0].text:'semua juri',tk=lb+'__'+mi;
+    const sc=Object.keys(S.scores).filter(i=>{const s=S.scores[i];return s.lomba===lb&&+s.mitra===mi&&(!jd||s.judge===jd)}),dr=Object.keys(S.drafts).filter(i=>{const p=i.split('__');return p[0]===lb&&+p[1]===mi&&(!jd||p[2]===jd)});
+    if(!confirm('Hapus '+W.map(w=>tg[w]).join(', ')+'\n\nMitra: '+nm+'\nLomba: '+ln+'\nJuri: '+jn+'\n\nTersimpan saat ini: '+sc.length+' nilai, '+dr.length+' draf.\nTidak bisa dibatalkan.'))return;
     if(!API.on()){if(W.includes('scores')){const all=ld('scores',{});sc.forEach(i=>delete all[i]);sv('scores',all);S.scores=all}
-      if(W.includes('timers')){delete S.timers[lb+'__'+mi];sv('tmrs',S.timers)}
-      if(W.includes('drafts'))Object.keys(localStorage).filter(x=>x.indexOf('dr:'+lb+'__'+mi+'__')===0).forEach(rm);
+      if(W.includes('timers')){delete S.timers[tk];sv('tmrs',S.timers)}
+      if(W.includes('drafts'))Object.keys(localStorage).filter(x=>{const p='dr:'+tk+'__';return x.indexOf(p)===0&&(!jd||x.slice(p.length)===jd)}).forEach(rm);
       alert('Data lokal dihapus.');return renderAdmin()}
-    try{const j=await API.post({op:'clear',what:W,lb:lb,mi:mi},true),n=j.n||{};
-      if(W.includes('scores'))sc.forEach(i=>delete S.scores[i]);if(W.includes('drafts'))dr.forEach(i=>delete S.drafts[i]);if(W.includes('timers'))delete S.timers[lb+'__'+mi];
-      alert('Selesai. Terhapus: '+(n.scores||0)+' nilai, '+(n.drafts||0)+' draf, '+(n.timers||0)+' stopwatch.')}
+    try{if(W.includes('scores')&&sc.length)await API.del('scores',sc,true);
+      if(W.includes('drafts')&&dr.length)await API.del('drafts',dr,true);
+      if(W.includes('timers'))await API.del('timers',[tk],true);
+      if(W.includes('scores'))sc.forEach(i=>delete S.scores[i]);if(W.includes('drafts'))dr.forEach(i=>delete S.drafts[i]);if(W.includes('timers'))delete S.timers[tk];
+      alert('Selesai. Terhapus: '+(W.includes('scores')?sc.length:0)+' nilai, '+(W.includes('drafts')?dr.length:0)+' draf'+(W.includes('timers')?', stopwatch mitra ini':'')+'.')}
     catch(e){alert('Gagal: '+(e.message||e))}
+    return setTimeout(renderAdmin,500)}
+  if(k==='jdl'){const [jid,lb]=String(v).split('|'),jn=(Object.values(S.scores).find(s=>s.judge===jid)||{}).judgeName||jid,ln=LB[lb]?LB[lb].nama:lb;
+    const sc=Object.keys(S.scores).filter(i=>{const s=S.scores[i];return s.judge===jid&&s.lomba===lb}),dr=Object.keys(S.drafts).filter(i=>{const p=i.split('__');return p[0]===lb&&p[2]===jid});
+    if(!sc.length&&!dr.length)return alert('Tidak ada data untuk dihapus.');
+    if(!confirm('Hapus '+sc.length+' nilai terkirim dan '+dr.length+' draf milik '+jn+' pada lomba '+ln+'?\n\nNilai juri lain dan lomba lain tidak terhapus.\nTidak bisa dibatalkan.'))return;
+    try{if(S.col){if(sc.length)await API.del('scores',sc,true);if(dr.length)await API.del('drafts',dr,true);sc.forEach(i=>delete S.scores[i]);dr.forEach(i=>delete S.drafts[i])}
+      else{const all=ld('scores',{});sc.forEach(i=>delete all[i]);sv('scores',all);S.scores=all;dr.forEach(i=>{rm('dr:'+i);delete S.drafts[i]})}
+      alert('Terhapus: '+sc.length+' nilai, '+dr.length+' draf.')}catch(e){alert('Gagal: '+(e.message||e))}
     return setTimeout(renderAdmin,500)}
   if(k==='jclear'){if(!confirm('Hapus foto dan tanda tangan juri ini? Juri harus membuat profil lagi sebelum mengirim nilai. Nilai yang sudah dikirim tidak terhapus.'))return;
     try{await API.post({op:'clear',what:['juri'],judge:v},true);alert('Profil juri dihapus.')}catch(e){alert('Gagal: '+(e.message||e))}return renderAdmin()}
