@@ -589,14 +589,26 @@ async function renderAdmin(){stopCam();document.body.dataset.v='admin';
   <div class="card" id="verif">${verifHtml(users,jp)}</div>
   <div class="card" id="guide">${guideInner()}</div>
   <div class="card" id="clearc"><h2>🧹 Pusat Hapus Data</h2><p class="mut">Tombol di sini menghapus langsung di server (Google Sheet dan Drive), bukan hanya di layar ini. Tidak bisa dibatalkan.</p>
-  <details class="as" open><summary><span>⏱ Stopwatch bersama</span><span class="mut">${nTa} aktif · ${nTd} selesai</span></summary><div class="sub"><p>Menghapus semua stopwatch (berjalan, dijeda, atau selesai) untuk semua juri. Pop-up di HP juri hilang dalam beberapa detik.</p>${B('clear','timers','Hapus semua stopwatch')}</div></details>
+  <details class="as" open><summary><span>🎯 Hapus per lomba dan mitra</span><span class="mut">satu mitra pada satu lomba</span></summary><div class="sub"><p>Menghapus data satu mitra pada satu lomba saja. Lomba lain dan mitra lain tidak tersentuh.</p>
+  <label>Lomba</label><select id="dlL" onchange="admCount()">${CONFIG.lombas.map(l=>`<option value="${l.id}">${esc(l.nama)}</option>`).join('')}</select>
+  <label>Mitra</label><select id="dlM" onchange="admCount()">${CONFIG.mitra.map((m,i)=>`<option value="${i}">${i+1}. ${esc(m)}</option>`).join('')}</select>
+  <div class="mut" id="dlC" style="margin:8px 0"></div>
+  <label style="display:flex;gap:8px;align-items:center;margin:4px 0"><input type="checkbox" id="dlS" checked style="width:auto;min-height:0"> Nilai terkirim</label>
+  <label style="display:flex;gap:8px;align-items:center;margin:4px 0"><input type="checkbox" id="dlD" checked style="width:auto;min-height:0"> Draf di server</label>
+  <label style="display:flex;gap:8px;align-items:center;margin:4px 0"><input type="checkbox" id="dlT" checked style="width:auto;min-height:0"> Stopwatch</label>
+  <p class="mut">Draf muncul lagi bila juri masih membuka halaman Nilai mitra ini. Minta juri pindah mitra atau menutup halaman dulu.</p>
+  ${B('mclear','','Hapus data lomba dan mitra ini')}</div></details>
+  <details class="as"><summary><span>⏱ Stopwatch bersama</span><span class="mut">${nTa} aktif · ${nTd} selesai</span></summary><div class="sub"><p>Menghapus semua stopwatch (berjalan, dijeda, atau selesai) untuk semua juri. Pop-up di HP juri hilang dalam beberapa detik.</p>${B('clear','timers','Hapus semua stopwatch')}</div></details>
   <details class="as"><summary><span>📝 Nilai terkirim</span><span class="mut">${sc.length} lembar</span></summary><div class="sub">${CONFIG.lombas.map(l=>B('lomba',l.id,'Hapus semua nilai '+esc(l.short),'sec')).join('')}${js.map(([k,n])=>B('judge',k,'Hapus nilai juri: '+esc(n),'sec')).join('')}${B('all','','HAPUS SEMUA NILAI')}</div></details>
   <details class="as"><summary><span>✎ Draf di server</span><span class="mut">${nDr} draf</span></summary><div class="sub"><p>Draf nilai yang belum dikirim juri.</p>${B('clear','drafts','Hapus semua draf')}</div></details>
   <details class="as"><summary><span>🪪 Profil juri (foto &amp; tanda tangan)</span><span class="mut">${nJp} tersimpan</span></summary><div class="sub"><p>Menghapus data profil beserta file foto dan tanda tangan di Google Drive. Akun dan PIN juri tidak ikut terhapus. Untuk satu juri saja, buka kartunya di Verifikasi juri lalu pilih Hapus profil.</p>${B('clear','juri','Hapus semua profil juri')}</div></details>
   <details class="as"><summary><span>🏁 Pilihan lomba juri</span></summary><div class="sub"><p>Mengosongkan lomba yang dipilih semua juri. Juri memilih lagi di Profil Juri.</p>${B('clear','lomba','Reset pilihan lomba semua juri','sec')}</div></details>
   <details class="as"><summary><span>🔑 Sesi login</span></summary><div class="sub"><p>Mengeluarkan semua juri dan Anda dari sesi. Semua harus masuk lagi.</p>${B('clear','sesi','Keluarkan semua sesi','sec')}</div></details>
   <details class="as"><summary><span>📱 Data di perangkat ini</span></summary><div class="sub"><p>Draf, stopwatch, dan profil yang tersimpan di browser HP ini.</p>${B('local','','Reset data di perangkat ini','sec')}</div></details>
-  <div class="danger"><b class="bad">Zona bahaya</b><p class="mut">Menghapus nilai, draf, stopwatch, profil juri, dan pilihan lomba sekaligus. Akun juri tetap ada.</p>${B('clear','all','RESET SEMUA DATA LOMBA')}</div></div>`}
+  <div class="danger"><b class="bad">Zona bahaya</b><p class="mut">Menghapus nilai, draf, stopwatch, profil juri, dan pilihan lomba sekaligus. Akun juri tetap ada.</p>${B('clear','all','RESET SEMUA DATA LOMBA')}</div></div>`;admCount()}
+function admCount(){const L=$('#dlL'),M=$('#dlM'),o=$('#dlC');if(!L||!M||!o)return;
+  const lb=L.value,mi=+M.value,sc=Object.values(S.scores).filter(s=>s.lomba===lb&&+s.mitra===mi),dr=Object.keys(S.drafts).filter(k=>{const p=k.split('__');return p[0]===lb&&+p[1]===mi}),tm=S.timers[lb+'__'+mi],ta=tm&&tm.status&&tm.status!=='idle'?1:0;
+  o.innerHTML=`Tersimpan saat ini: <b>${sc.length}</b> nilai terkirim${sc.length?' ('+esc(sc.map(s=>s.judgeName||s.judge).join(', '))+')':''} · <b>${dr.length}</b> draf · <b>${ta}</b> stopwatch`}
 async function admAct(k,v){
   if(k==='jmedia'){const box=$('#jm-'+v);if(!box)return;box.innerHTML='<p class="mut">Memuat foto dan tanda tangan…</p>';
     try{const j=await API.post({op:'juri.get',id:v},true);box.innerHTML=(j.foto?`<img class="foto" src="${j.foto}" alt="Foto juri">`:'<p class="mut">Foto belum ada.</p>')+(j.ttd?`<img src="${j.ttd}" alt="Tanda tangan" style="max-width:260px;width:100%;background:#fff;border:1px solid var(--line);border-radius:8px;display:block;margin-top:6px">`:'<p class="mut">Tanda tangan belum ada.</p>')}
@@ -617,6 +629,20 @@ async function admAct(k,v){
       if(v==='timers'||v==='all')S.timers={};if(v==='drafts'||v==='all')S.drafts={};if(v==='all')S.scores={};S.swHide={};
       if(v==='sesi'){alert('Semua sesi dikeluarkan. Masuk lagi.');S.atok='';S.prof={};rm('profil');S.tab='profil';return render()}
       const tot=Object.values(n).reduce((x,y)=>x+y,0);alert(tot?'Selesai. '+tot+' data dihapus.':'Selesai. Tidak ada data yang perlu dihapus.')}
+    catch(e){alert('Gagal: '+(e.message||e))}
+    return setTimeout(renderAdmin,500)}
+  if(k==='mclear'){const lb=$('#dlL').value,mi=+$('#dlM').value,W=[];if($('#dlS').checked)W.push('scores');if($('#dlD').checked)W.push('drafts');if($('#dlT').checked)W.push('timers');
+    if(!W.length)return alert('Pilih minimal satu jenis data yang akan dihapus.');
+    const tg={scores:'nilai terkirim',drafts:'draf',timers:'stopwatch'},nm=CONFIG.mitra[mi],ln=LB[lb].nama;
+    const sc=Object.keys(S.scores).filter(i=>{const s=S.scores[i];return s.lomba===lb&&+s.mitra===mi}),dr=Object.keys(S.drafts).filter(i=>{const p=i.split('__');return p[0]===lb&&+p[1]===mi});
+    if(!confirm('Hapus '+W.map(w=>tg[w]).join(', ')+' untuk '+nm+' pada lomba '+ln+'?\n\nTersimpan saat ini: '+sc.length+' nilai, '+dr.length+' draf.\nTidak bisa dibatalkan.'))return;
+    if(!API.on()){if(W.includes('scores')){const all=ld('scores',{});sc.forEach(i=>delete all[i]);sv('scores',all);S.scores=all}
+      if(W.includes('timers')){delete S.timers[lb+'__'+mi];sv('tmrs',S.timers)}
+      if(W.includes('drafts'))Object.keys(localStorage).filter(x=>x.indexOf('dr:'+lb+'__'+mi+'__')===0).forEach(rm);
+      alert('Data lokal dihapus.');return renderAdmin()}
+    try{const j=await API.post({op:'clear',what:W,lb:lb,mi:mi},true),n=j.n||{};
+      if(W.includes('scores'))sc.forEach(i=>delete S.scores[i]);if(W.includes('drafts'))dr.forEach(i=>delete S.drafts[i]);if(W.includes('timers'))delete S.timers[lb+'__'+mi];
+      alert('Selesai. Terhapus: '+(n.scores||0)+' nilai, '+(n.drafts||0)+' draf, '+(n.timers||0)+' stopwatch.')}
     catch(e){alert('Gagal: '+(e.message||e))}
     return setTimeout(renderAdmin,500)}
   if(k==='jclear'){if(!confirm('Hapus foto dan tanda tangan juri ini? Juri harus membuat profil lagi sebelum mengirim nilai. Nilai yang sudah dikirim tidak terhapus.'))return;
